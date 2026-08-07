@@ -1,0 +1,125 @@
+/* Localizable.strings (English) — DevClean */
+
+/* === ScanView === */
+"畅快清理，清爽一下" = "Clean up, feel the difference";
+"欢迎使用 DevClean" = "Welcome to DevClean";
+"开始扫描" = "Start Scan";
+"已发现可清理" = "Cleanable found";
+"正在扫描" = "Scanning";
+
+/* === ScanSummaryView === */
+"扫描完成" = "Scan Complete";
+"发现可清理" = "Cleanable";
+"共 %lld 个项目，推荐清理 %@" = "%lld items, recommended cleanup %@";
+"重新扫描" = "Rescan";
+"查看详情" = "View Details";
+"近 30 天清理趋势" = "Last 30 Days Trend";
+"释放空间 Top 5" = "Top 5 Space Freed";
+"累计释放" = "Total Freed";
+"共 %lld 次清理" = "%lld cleanups";
+"上次清理" = "Last Cleanup";
+"暂无" = "N/A";
+"最大来源" = "Top Source";
+"累计 %@" = "Total %@";
+
+/* === ContentView === */
+"确认清理" = "Confirm Cleanup";
+"开始清理（%@）" = "Clean (%@)";
+"取消" = "Cancel";
+"将清理 %lld 个项目，预计回收 %@" = "Will clean %lld items, estimated %@ recoverable";
+
+/* === CleanupView === */
+"正在清理..." = "Cleaning...";
+"正在处理: %@" = "Processing: %@";
+"清理完成" = "Cleanup Complete";
+"已释放空间:" = "Space Freed:";
+"已移到废纸篓" = "Moved to Trash";
+"（清空后释放空间）" = "(empty Trash to free space)";
+"预计回收" = "Estimated";
+"清理失败" = "Cleanup Failed";
+"部分文件因权限不足无法删除，请检查完全磁盘访问权限" = "Some files could not be deleted due to insufficient permissions. Please check Full Disk Access.";
+
+/* === ResultsView === */
+"共发现可清理 %@" = "Found %@ cleanable";
+"已选 %lld 项  %@" = "%lld selected  %@";
+"开始清理" = "Start Cleanup";
+"删除影响" = "Deletion Impact";
+
+/* === DuplicateFinderView === */
+"重复文件查找" = "Duplicate Finder";
+"可回收 %@" = "Recoverable %@";
+"清理选中重复项" = "Clean Duplicates";
+"将把 %lld 个重复文件移到废纸篓" = "Move %lld duplicate files to Trash";
+"正在扫描重复文件..." = "Scanning for duplicates...";
+"按文件大小 → 部分哈希 → 完整哈希三阶段筛选" = "Three-phase filter: size → partial hash → full hash";
+"没有找到重复文件" = "No duplicates found";
+"查找主目录下的重复文件" = "Find duplicate files in home directory";
+"通过文件内容哈希精确识别完全相同的文件" = "Identify identical files by content hash";
+"选择左侧的重复组查看文件" = "Select a group to view files";
+"选择要保留的文件，其余将被清理" = "Select the file to keep, others will be cleaned";
+"保留" = "Keep";
+"删除" = "Remove";
+"保留策略:" = "Strategy:";
+"最新文件" = "Newest";
+"最短路径" = "Shortest Path";
+"指定目录" = "Preferred Dir";
+"选择目录" = "Choose Dir";
+
+/* === AppUninstallerView === */
+"应用卸载器" = "App Uninstaller";
+"加载应用列表..." = "Loading apps...";
+"选择一个应用查看详情" = "Select an app for details";
+"也可以拖放 .app 文件到左侧列表" = "Or drag & drop .app files to the list";
+
+/* === DiskVisualizationView === */
+"磁盘可视化" = "Disk Visualization";
+"点击「开始」扫描磁盘使用情况" = "Click Start to scan disk usage";
+
+/* === ActivityMonitorView === */
+"活动监视器" = "Activity Monitor";
+"正在获取进程列表…" = "Loading processes…";
+"获取进程失败" = "Failed to load processes";
+"重试" = "Retry";
+"选择一个进程查看详情" = "Select a process for details";
+"路径" = "Path";
+"关了会怎样" = "What if I close this?";
+"建议" = "Recommendation";
+"终止进程" = "Terminate";
+"仍要终止（危险）" = "Terminate Anyway (Risky)";
+"强制终止" = "Force Quit";
+"此进程为系统核心，禁止终止" = "Critical system process — do not terminate";
+"关闭后系统功能可能异常" = "May cause system instability";
+"搜索进程名或描述…" = "Search process name…";
+"手动刷新" = "Refresh";
+
+/* === MemoryCleanerView === */
+"内存清理" = "Memory Cleaner";
+"内存压力" = "Memory Pressure";
+"正在清理内存..." = "Cleaning memory...";
+"清理内存" = "Clean Memory";
+
+/* === MenuBarPopoverView === */
+"磁盘空间不足！" = "Low Disk Space!";
+"可用" = "Available";
+
+/* === PermissionDiagnosticView === */
+"权限诊断" = "Permission Diagnostics";
+"检测哪些目录因权限限制无法扫描" = "Detect directories blocked by permission restrictions";
+"目录访问状态" = "Directory Access Status";
+"受影响的扫描模块" = "Affected Scan Modules";
+
+/* === PermissionGuideView === */
+"需要完全磁盘访问权限" = "Full Disk Access Required";
+
+/* === SettingsView === */
+"外观" = "Appearance";
+"语言" = "Language";
+"主题色" = "Accent Color";
+"窗口外观" = "Window Appearance";
+"应用语言" = "App Language";
+"当前语言" = "Current Language";
+"系统语言" = "System Language";
+
+/* === AppCommands === */
+"新建扫描" = "New Scan";
+"偏好设置…" = "Preferences…";

@@ -1,0 +1,96 @@
+name: MacCleaner
+options:
+  bundleIdPrefix: com.maccleaner
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.4"
+  generateEmptyDirectories: false
+  createIntermediateGroups: true
+  defaultLocalization: zh-Hans
+
+packages:
+  MacCleanerCore:
+    path: .
+
+targets:
+  helper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: helper
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.maccleaner.helper
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_STYLE: Automatic
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Development"
+
+  MacCleanerAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/MacCleanerAppTests
+    dependencies:
+      - target: MacCleanerApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.maccleaner.app.tests
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/DevClean.app/Contents/MacOS/DevClean"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+  MacCleanerApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/MacCleanerApp
+    dependencies:
+      - package: MacCleanerCore
+        product: MacCleanerCore
+    settings:
+      base:
+        PRODUCT_NAME: DevClean
+        PRODUCT_BUNDLE_IDENTIFIER: com.maccleaner.app
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        INFOPLIST_FILE: MacCleanerApp/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MacCleanerApp/MacCleaner.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: false
+        ENABLE_HARDENED_RUNTIME: true
+        COMBINE_HIDPI_IMAGES: true
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Development"
+    entitlements:
+      path: MacCleanerApp/MacCleaner.entitlements
+    info:
+      path: MacCleanerApp/Info.plist
+      properties:
+        LSMinimumSystemVersion: "14.0"
+        NSHumanReadableCopyright: "Copyright 2026. All rights reserved."
+        CFBundleDevelopmentRegion: zh-Hans
+
+schemes:
+  MacCleanerApp:
+    build:
+      targets:
+        MacCleanerApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MacCleanerAppTests

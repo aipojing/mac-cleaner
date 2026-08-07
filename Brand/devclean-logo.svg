@@ -1,0 +1,38 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="126" y1="118" x2="886" y2="918" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D63FF"/>
+      <stop offset="0.58" stop-color="#1AA3E8"/>
+      <stop offset="1" stop-color="#44D1A7"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="302" y1="700" x2="770" y2="566" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A7FFF0"/>
+      <stop offset="1" stop-color="#ECFFFF"/>
+    </linearGradient>
+    <filter id="shadow" x="220" y="176" width="638" height="662" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="20"/>
+      <feGaussianBlur stdDeviation="26"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0196078 0 0 0 0 0.145098 0 0 0 0 0.305882 0 0 0 0.2 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect x="96" y="96" width="832" height="832" rx="190" fill="url(#bg)"/>
+  <path d="M170 224C234 139 334 96 441 96H728C835 96 934 139 998 223V328H96V224C120 246 149 252 170 224Z" fill="white" fill-opacity="0.08"/>
+  <circle cx="766" cy="242" r="96" fill="white" fill-opacity="0.08"/>
+  <circle cx="274" cy="770" r="146" fill="#0A2C66" fill-opacity="0.12"/>
+
+  <g filter="url(#shadow)">
+    <path d="M326 250V774" stroke="white" stroke-width="104" stroke-linecap="round"/>
+    <path d="M378 250H519C676 250 790 363 790 512C790 661 676 774 519 774H378" stroke="white" stroke-width="104" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M318 684C414 750 577 753 706 649" stroke="url(#sweep)" stroke-width="40" stroke-linecap="round"/>
+  </g>
+
+  <path d="M782 230L797 269L836 284L797 299L782 338L767 299L728 284L767 269L782 230Z" fill="white"/>
+  <circle cx="710" cy="356" r="11" fill="white" fill-opacity="0.92"/>
+  <circle cx="680" cy="392" r="7" fill="white" fill-opacity="0.74"/>
+</svg>
