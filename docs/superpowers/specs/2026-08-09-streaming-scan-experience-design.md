@@ -92,3 +92,11 @@ fts 枚举主目录
 - 最终列表仍为准确、稳定排序的 Top 50，既有清理与确认流程不变。
 - 同时进行的 FTS 遍历不超过 2。
 - Core 与 App 测试通过，且 CLI 的无观察者扫描输出保持兼容。
+
+## 实现状态
+
+已实现（2026-08-09，对应提交 `App: stream large-file scan results`）。实际验证命令与结果：
+
+1. `swift test` —— 316 tests / 64 suites 全部通过。
+2. `xcodebuild test -project MacCleaner.xcodeproj -scheme MacCleanerApp -destination 'platform=macOS'` —— TEST SUCCEEDED，含新增套件 `Scan view model live large-file results`。
+3. `xcodebuild build -project MacCleaner.xcodeproj -scheme MacCleanerApp -configuration Debug` —— BUILD SUCCEEDED。

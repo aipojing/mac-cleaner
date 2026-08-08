@@ -34,17 +34,21 @@ public struct TopNHeap<Element> {
         return tieBreak(a) < tieBreak(b)
     }
 
-    public mutating func insert(_ element: Element) {
-        guard capacity > 0 else { return }
+    /// 插入元素，返回保留集合是否发生变化（新进入或替换堆顶）。
+    @discardableResult
+    public mutating func insert(_ element: Element) -> Bool {
+        guard capacity > 0 else { return false }
         if storage.count < capacity {
             storage.append(element)
             siftUp(from: storage.count - 1)
             maximumObservedCount = max(maximumObservedCount, storage.count)
-        } else if ranksBefore(element, storage[0]) {
-            // 堆顶是当前保留集中排名最低的；新元素更好则替换
-            storage[0] = element
-            siftDown(from: 0)
+            return true
         }
+        // 堆顶是当前保留集中排名最低的；新元素更好则替换
+        guard ranksBefore(element, storage[0]) else { return false }
+        storage[0] = element
+        siftDown(from: 0)
+        return true
     }
 
     /// 按排名从高到低输出。

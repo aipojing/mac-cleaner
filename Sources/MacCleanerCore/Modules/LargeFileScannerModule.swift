@@ -26,26 +26,8 @@ public struct LargeFileScannerModule: CleanerModule {
 
         // 顺序型模块：整个枚举过程占用一个文件任务许可。
         return try await context.fileTaskLimiter.withPermit {
-            let files = collectLargeFiles()
-            let items = files.map { file in
-                let name = (file.path as NSString).lastPathComponent
-                let dir = ((file.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
-                let ext = (name as NSString).pathExtension.lowercased()
-                let kind = classify(path: file.path, fileName: name, dirName: dir)
-
-                return CleanableItem(
-                    path: file.path,
-                    displayName: "\(dir)/\(name)",
-                    // 默认展示磁盘实际占用；逻辑大小保留在 allocatedSize 之外的详情来源
-                    size: file.allocatedSize,
-                    category: .largeFiles,
-                    subcategory: ext.isEmpty ? "unknown-extension" : ext,
-                    evidenceTags: ["large-file", kind],
-                    fileIdentity: file.identity,
-                    allocatedSize: file.allocatedSize,
-                    linkCount: file.linkCount
-                )
-            }
+            let files = try collectLargeFiles(onUpdate: context.onLargeFileUpdate)
+            let items = files.map { makeItem(from: $0) }
 
             return ScanResult(
                 module: .largeFiles,
@@ -55,13 +37,37 @@ public struct LargeFileScannerModule: CleanerModule {
         }
     }
 
+    /// 实时快照与最终结果共用的条目构造，防止分类/身份字段漂移。
+    private func makeItem(from file: FileMetadata) -> CleanableItem {
+        let name = (file.path as NSString).lastPathComponent
+        let dir = ((file.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        let ext = (name as NSString).pathExtension.lowercased()
+        let kind = classify(path: file.path, fileName: name, dirName: dir)
+
+        return CleanableItem(
+            path: file.path,
+            displayName: "\(dir)/\(name)",
+            // 默认展示磁盘实际占用；逻辑大小保留在 allocatedSize 之外的详情来源
+            size: file.allocatedSize,
+            category: .largeFiles,
+            subcategory: ext.isEmpty ? "unknown-extension" : ext,
+            evidenceTags: ["large-file", kind],
+            fileIdentity: file.identity,
+            allocatedSize: file.allocatedSize,
+            linkCount: file.linkCount
+        )
+    }
+
     // MARK: - 有界枚举
 
     /// fts 枚举过程中立即把满足阈值的对象放入最小堆，
     /// 常驻候选不超过 limit，不再全量收集后排序。
     /// 评分与阈值都使用实际占用（st_blocks * 512）。
-    private func collectLargeFiles() -> [FileMetadata] {
-        FTSTraversalGate.withPermit {
+    /// onUpdate 非 nil 时边枚举边发布限频的实时快照，并以最终快照收尾。
+    private func collectLargeFiles(
+        onUpdate: (@Sendable (LargeFileScanUpdate) -> Void)?
+    ) throws -> [FileMetadata] {
+        try FTSTraversalGate.withPermit {
             let cPath = scanRoot.withCString { strdup($0) }
             guard let cPath else { return [] }
             defer { free(cPath) }
@@ -69,7 +75,7 @@ public struct LargeFileScannerModule: CleanerModule {
             let skipDirs: Set<String> = ["Library", ".Trash", ".gradle", ".m2", ".npm", ".cocoapods", ".pub-cache"]
 
             var paths: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
-            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR, nil) else {
+            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil) else {
                 return []
             }
             defer { fts_close(fts) }
@@ -80,8 +86,30 @@ public struct LargeFileScannerModule: CleanerModule {
                 score: \.allocatedSize,
                 tieBreak: \.path
             )
+            // 首发立即、间隔内合并、结束必发的限频发布器（每秒最多 5 次）
+            var publisher = onUpdate.map { handler in
+                LargeFileUpdatePublisher<LargeFileScanUpdate>(
+                    minimumInterval: 0.2,
+                    now: { ProcessInfo.processInfo.systemUptime },
+                    deliver: handler
+                )
+            }
+            var matchedFileCount = 0
+            var matchedAllocatedSize: Int64 = 0
+            var countedIdentities: Set<String> = []
+
+            func snapshot(isFinal: Bool) -> LargeFileScanUpdate {
+                LargeFileScanUpdate(
+                    items: heap.sortedDescending().map { makeItem(from: $0) },
+                    matchedFileCount: matchedFileCount,
+                    matchedAllocatedSize: matchedAllocatedSize,
+                    isFinal: isFinal
+                )
+            }
 
             while let entry = fts_read(fts) {
+                if Task.isCancelled { throw CancellationError() }
+
                 let filePath = String(cString: entry.pointee.fts_path)
                 let name = (filePath as NSString).lastPathComponent
 
@@ -104,11 +132,19 @@ public struct LargeFileScannerModule: CleanerModule {
                         + Int64(st.st_mtimespec.tv_nsec)
                 )
                 guard metadata.allocatedSize >= minAllocatedSize else { continue }
+                matchedFileCount += 1
+                // 硬链接去重：同一 (device, inode) 的物理占用只计一次
+                if countedIdentities.insert("\(st.st_dev):\(st.st_ino)").inserted {
+                    matchedAllocatedSize += metadata.allocatedSize
+                }
                 heap.insert(metadata)
                 progress.report(path: filePath)
+                publisher?.submit(snapshot(isFinal: false))
             }
 
-            return heap.sortedDescending()
+            let finalFiles = heap.sortedDescending()
+            publisher?.finish(snapshot(isFinal: true))
+            return finalFiles
         }
     }
 

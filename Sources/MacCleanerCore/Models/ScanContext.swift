@@ -9,6 +9,8 @@ public struct ScanContext: Sendable {
     public let fileTaskLimiter: AsyncLimiter
     /// full hash 任务并发许可（默认 4，防止大文件 IO 打满磁盘）。
     public let hashTaskLimiter: AsyncLimiter
+    /// 大文件扫描的实时快照处理器；nil 时不产生任何临时 UI 数据。
+    public let onLargeFileUpdate: (@Sendable (LargeFileScanUpdate) -> Void)?
 
     /// 文件系统任务默认并发上限：min(max(activeProcessorCount, 2), 8)。
     public static var defaultFileTaskLimit: Int {
@@ -31,10 +33,12 @@ public struct ScanContext: Sendable {
     public init(
         metadataIndex: FileMetadataIndex = FileMetadataIndex(),
         fileTaskLimit: Int = ScanContext.defaultFileTaskLimit,
-        hashTaskLimit: Int = ScanContext.defaultHashTaskLimit
+        hashTaskLimit: Int = ScanContext.defaultHashTaskLimit,
+        onLargeFileUpdate: (@Sendable (LargeFileScanUpdate) -> Void)? = nil
     ) {
         self.metadataIndex = metadataIndex
         self.fileTaskLimiter = AsyncLimiter(limit: fileTaskLimit)
         self.hashTaskLimiter = AsyncLimiter(limit: hashTaskLimit)
+        self.onLargeFileUpdate = onLargeFileUpdate
     }
 }

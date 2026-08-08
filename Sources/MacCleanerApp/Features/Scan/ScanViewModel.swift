@@ -23,6 +23,16 @@ final class ScanViewModel {
     var totalDiscoveredSize: Int64 = 0
     var currentScanPath: String = ""
 
+    /// 单模块大文件扫描进行中的实时状态；扫描结束/取消/重置时清空。
+    var liveLargeFileItems: [CleanableItem] = []
+    var liveLargeFileMatchCount = 0
+    var liveLargeFileMatchedSize: Int64 = 0
+
+    /// 仅当本次扫描只选中大文件模块时才启用实时预览。
+    var isLargeFileScan: Bool {
+        selectedModuleIDs == [.largeFiles]
+    }
+
     private var scanTask: Task<Void, Never>?
     private var pathPollTask: Task<Void, Never>?
 
@@ -33,6 +43,7 @@ final class ScanViewModel {
     func startScan() {
         scanTask?.cancel()
         results = []
+        clearLiveLargeFileResults()
 
         let moduleIDs = selectedModuleIDs
         totalDiscoveredSize = 0
@@ -65,30 +76,48 @@ final class ScanViewModel {
             phase = .scanning(completed: 0, total: total)
             logger.notice("scanning \(total) modules via coordinator")
 
-            // 统一扫描入口：共享 ScanContext，模块级有界并发。
-            let coordinator = ScanCoordinator(modules: modules) { outcome in
-                if let error = outcome.error {
-                    logger.error("\(outcome.module.displayName) error: \(error.localizedDescription)")
-                }
-                Task { @MainActor [weak self] in
-                    guard let self, case .scanning = self.phase else { return }
-                    self.phase = .scanning(completed: outcome.completedCount, total: outcome.totalCount)
-                    if let result = outcome.result {
-                        // 实时追加到 results，让 UI 能立即显示已完成模块
-                        self.results.append(result)
-                        self.completedModules.append(result.module)
-                        self.totalDiscoveredSize = PhysicalSizeCalculator.uniqueAllocatedBytes(
-                            in: self.results.flatMap(\.items)
-                        )
+            // 仅单模块大文件扫描接入实时快照处理器（已在核心层限频）
+            let updateHandler: (@Sendable (LargeFileScanUpdate) -> Void)?
+            if moduleIDs == [.largeFiles] {
+                updateHandler = { [weak self] update in
+                    Task { @MainActor [weak self] in
+                        guard let self else { return }
+                        self.applyLargeFileUpdate(update)
                     }
                 }
+            } else {
+                updateHandler = nil
             }
+
+            // 统一扫描入口：共享 ScanContext，模块级有界并发。
+            let coordinator = ScanCoordinator(
+                modules: modules,
+                onModuleFinished: { outcome in
+                    if let error = outcome.error {
+                        logger.error("\(outcome.module.displayName) error: \(error.localizedDescription)")
+                    }
+                    Task { @MainActor [weak self] in
+                        guard let self, case .scanning = self.phase else { return }
+                        self.phase = .scanning(completed: outcome.completedCount, total: outcome.totalCount)
+                        if let result = outcome.result {
+                            // 实时追加到 results，让 UI 能立即显示已完成模块
+                            self.results.append(result)
+                            self.completedModules.append(result.module)
+                            self.totalDiscoveredSize = PhysicalSizeCalculator.uniqueAllocatedBytes(
+                                in: self.results.flatMap(\.items)
+                            )
+                        }
+                    }
+                },
+                onLargeFileUpdate: updateHandler
+            )
 
             let scanned: [ScanResult]
             do {
                 scanned = try await coordinator.scan()
             } catch {
                 guard !Task.isCancelled else { return }
+                clearLiveLargeFileResults()
                 phase = .failed(error.localizedDescription)
                 return
             }
@@ -97,6 +126,7 @@ final class ScanViewModel {
 
             pathPollTask?.cancel()
             currentScanPath = ""
+            clearLiveLargeFileResults()
 
             // 并行应用统一排除过滤器（与 CLI、定时扫描同一入口）
             let filter = ScanResultFilter(exclusionManager: ExclusionManager.shared)
@@ -137,6 +167,7 @@ final class ScanViewModel {
     func cancel() {
         scanTask?.cancel()
         pathPollTask?.cancel()
+        clearLiveLargeFileResults()
         phase = .idle
     }
 
@@ -147,6 +178,20 @@ final class ScanViewModel {
         completedModules = []
         totalDiscoveredSize = 0
         currentScanPath = ""
+        clearLiveLargeFileResults()
         phase = .idle
+    }
+
+    /// 应用核心层已限频的实时快照；只替换临时状态，绝不写入正式 results。
+    func applyLargeFileUpdate(_ update: LargeFileScanUpdate) {
+        liveLargeFileItems = update.items
+        liveLargeFileMatchCount = update.matchedFileCount
+        liveLargeFileMatchedSize = update.matchedAllocatedSize
+    }
+
+    private func clearLiveLargeFileResults() {
+        liveLargeFileItems = []
+        liveLargeFileMatchCount = 0
+        liveLargeFileMatchedSize = 0
     }
 }

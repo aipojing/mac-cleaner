@@ -199,8 +199,8 @@ struct FTSGlobalLimitTests {
         let peak = DiskScanner.ftsConcurrencyTracker.peak
         #expect(peak > 0)
         #expect(
-            peak <= ScanContext.defaultFileTaskLimit,
-            "fts 并发峰值 \(peak) 超过全局限流 \(ScanContext.defaultFileTaskLimit)"
+            peak <= FTSTraversalGate.maximumConcurrentTraversals,
+            "fts 并发峰值 \(peak) 超过全局限流 \(FTSTraversalGate.maximumConcurrentTraversals)"
         )
     }
 
@@ -234,7 +234,7 @@ struct FTSGlobalLimitTests {
             snapshot.totalEntries - entriesBefore >= dirs.count + 3,
             "所有直接 fts_open 调用都必须进入统一 gate"
         )
-        #expect(snapshot.peak <= ScanContext.defaultFileTaskLimit)
+        #expect(snapshot.peak <= FTSTraversalGate.maximumConcurrentTraversals)
     }
 }
 

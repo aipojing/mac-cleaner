@@ -121,6 +121,11 @@ struct ScanView: View {
                 .frame(width: 320, alignment: .leading)
                 .animation(.none, value: shortScanPath)
 
+            // 大文件实时候选预览（只读，扫描完成后才进入既有结果与清理流程）
+            if viewModel.isLargeFileScan && !viewModel.liveLargeFileItems.isEmpty {
+                liveLargeFilePreview
+            }
+
             // 进度条
             if case let .scanning(completed, total) = viewModel.phase {
                 ProgressView(value: Double(completed), total: Double(total))
@@ -128,6 +133,43 @@ struct ScanView: View {
                     .tint(Brand.accent)
             }
         }
+    }
+
+    /// 大文件扫描中的只读实时预览：最多 5 行，不含任何清理入口。
+    private var liveLargeFilePreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("实时发现 · 扫描中")
+                .font(.callout)
+                .fontWeight(.semibold)
+            Text("已发现 \(viewModel.liveLargeFileMatchCount) 个大文件，排名会持续更新")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(viewModel.liveLargeFileItems.prefix(5), id: \.path) { item in
+                HStack(spacing: 6) {
+                    Text(item.displayName)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Text(SizeFormatter.format(bytes: item.allocatedSize))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text("扫描完成后可查看全部结果并选择清理")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .frame(width: 320, alignment: .leading)
+        .background(
+            Color(.controlBackgroundColor),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .brandCard(cornerRadius: 12)
     }
 
     private var shortScanPath: String {

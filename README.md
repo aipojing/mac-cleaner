@@ -38,7 +38,7 @@ DevClean 帮助开发者找出 Xcode、模拟器、包管理器、Docker、AI �
 | Android SDK | `android-sdk` | 旧版 platforms、build-tools、NDK、system images 与 AVD |
 | 大文件 | `large-files` | 主目录中大于 100 MB 的文件 |
 
-桌面应用还提供应用卸载及残留扫描、重复文件查找、磁盘可视化、内存清理和活动监视器。
+桌面应用还提供应用卸载及残留扫描、重复文件查找、磁盘可视化、内存清理和活动监视器。扫描大文件时，扫描页会流式展示已发现的候选（Top 50），排名随扫描进展持续更新。
 
 ## 环境要求
 

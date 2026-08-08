@@ -52,6 +52,7 @@
 		CC9E8222653C35CBE23741C7 /* AIPrivacyConsentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387EB677156DD71A64C0A36B /* AIPrivacyConsentStore.swift */; };
 		CCBA924E2229E6DF70A44D4A /* AppUninstallerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D9D19A165DC5124D80AEBC /* AppUninstallerViewModel.swift */; };
 		D19A7D266A9BB8DF055E362C /* DuplicateFinderViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */; };
+		D50A40F5E2E29FEA2E845CD8 /* ScanViewModelLiveResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A53A6EB86342FC2744BCC26B /* ScanViewModelLiveResultsTests.swift */; };
 		D5DB4FD07FF53C705DE6EBFB /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09205986F2B94BC55260B2FF /* AISettingsView.swift */; };
 		DBC9813F27B831015370492F /* DuplicateFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0425C907D7C5AEEF78FBDF04 /* DuplicateFinderView.swift */; };
 		EE835B5411C768D9B26F00B0 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F8EED51D08786F9C23B81B /* AppCommands.swift */; };
@@ -109,6 +110,7 @@
 		9FBA8EEF14858456B249D720 /* AppAITestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAITestDoubles.swift; sourceTree = "<group>"; };
 		A046E273B746FD42A71A1E2A /* CleanupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupView.swift; sourceTree = "<group>"; };
 		A0CC7994FA9C9F6C9D92C149 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A53A6EB86342FC2744BCC26B /* ScanViewModelLiveResultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanViewModelLiveResultsTests.swift; sourceTree = "<group>"; };
 		AC18394D1E38D146610EF627 /* CleanupViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupViewModel.swift; sourceTree = "<group>"; };
 		ACFC513C3E67BC9E7224EC2C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B8F6215F2497E3CC72434579 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
@@ -266,6 +268,7 @@
 				56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */,
 				8F6344206F4490D297FF6D5E /* ResultsAIViewModelTests.swift */,
 				EE174AC6FBFE2DAF57594143 /* ResultsSearchViewModelTests.swift */,
+				A53A6EB86342FC2744BCC26B /* ScanViewModelLiveResultsTests.swift */,
 				39B9E6CED858517E270C3A2C /* Support */,
 			);
 			path = MacCleanerAppTests;
@@ -528,6 +531,7 @@
 				D19A7D266A9BB8DF055E362C /* DuplicateFinderViewModelTests.swift in Sources */,
 				88A6F6A59EA572CF5EC1E8EF /* ResultsAIViewModelTests.swift in Sources */,
 				B267B91659CF717F30335EE3 /* ResultsSearchViewModelTests.swift in Sources */,
+				D50A40F5E2E29FEA2E845CD8 /* ScanViewModelLiveResultsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

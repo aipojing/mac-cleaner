@@ -46,6 +46,20 @@ struct TopNHeapTests {
         #expect(heap.sortedDescending() == [30, 20])
     }
 
+    @Test("插入结果只在保留集合变化时返回 true")
+    func reportsRetainedSetChanges() {
+        var heap = TopNHeap<Int>(capacity: 2, score: { Int64($0) })
+        let first = heap.insert(10)
+        let second = heap.insert(20)
+        let dropped = heap.insert(5)
+        let replaced = heap.insert(30)
+        #expect(first)
+        #expect(second)
+        #expect(!dropped)
+        #expect(replaced)
+        #expect(heap.sortedDescending() == [30, 20])
+    }
+
     @Test("输入少于容量时全部保留且峰值正确")
     func keepsAllWhenUnderCapacity() {
         var heap = TopNHeap<Int>(capacity: 10, score: { Int64($0) })

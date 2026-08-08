@@ -36,19 +36,22 @@ public struct ScanCoordinator: Sendable {
     public let maxConcurrentFileTasks: Int
     public let maxConcurrentHashTasks: Int
     private let progressHandler: (@Sendable (ScanModuleOutcome) -> Void)?
+    private let largeFileUpdateHandler: (@Sendable (LargeFileScanUpdate) -> Void)?
 
     public init(
         modules: [any CleanerModule],
         maxConcurrentModules: Int = 4,
         maxConcurrentFileTasks: Int = ScanContext.defaultFileTaskLimit,
         maxConcurrentHashTasks: Int = ScanContext.defaultHashTaskLimit,
-        onModuleFinished: (@Sendable (ScanModuleOutcome) -> Void)? = nil
+        onModuleFinished: (@Sendable (ScanModuleOutcome) -> Void)? = nil,
+        onLargeFileUpdate: (@Sendable (LargeFileScanUpdate) -> Void)? = nil
     ) {
         self.modules = modules
         self.maxConcurrentModules = max(1, maxConcurrentModules)
         self.maxConcurrentFileTasks = maxConcurrentFileTasks
         self.maxConcurrentHashTasks = maxConcurrentHashTasks
         self.progressHandler = onModuleFinished
+        self.largeFileUpdateHandler = onLargeFileUpdate
     }
 
     /// 运行一次扫描。返回成功模块的结果，顺序与输入模块一致。
@@ -57,7 +60,8 @@ public struct ScanCoordinator: Sendable {
 
         let context = ScanContext(
             fileTaskLimit: maxConcurrentFileTasks,
-            hashTaskLimit: maxConcurrentHashTasks
+            hashTaskLimit: maxConcurrentHashTasks,
+            onLargeFileUpdate: largeFileUpdateHandler
         )
         let moduleLimiter = AsyncLimiter(limit: maxConcurrentModules)
         let counter = CompletionCounter()

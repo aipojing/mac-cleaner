@@ -3,11 +3,11 @@ import Foundation
 /// 进程内所有 `fts_open` 遍历共用的并发边界。
 ///
 /// 调用方只负责在同步遍历闭包外包一层 `withPermit`，避免各模块各自
-/// 限流后叠加放大磁盘 IO。默认上限与扫描文件任务上限一致。
+/// 限流后叠加放大磁盘 IO。上限固定为保守的 2，与文件任务并发解耦，
+/// 避免模块并发与目录大小计算共同放大元数据读取压力。
 enum FTSTraversalGate {
-    private static let semaphore = DispatchSemaphore(
-        value: ScanContext.defaultFileTaskLimit
-    )
+    static let maximumConcurrentTraversals = 2
+    private static let semaphore = DispatchSemaphore(value: maximumConcurrentTraversals)
 
     static let tracker = FTSConcurrencyTracker()
 
