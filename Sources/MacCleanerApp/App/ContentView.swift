@@ -4,6 +4,7 @@ import MacCleanerCore
 struct ContentView: View {
     @Binding var onScanRequested: () -> Void
     let environment: AppEnvironment
+    @Environment(\.openSettings) private var openSettings
 
     @State private var screen: Screen = .scan
     @State private var scanVM = ScanViewModel()
@@ -49,6 +50,9 @@ struct ContentView: View {
                     case "diskVisualization": screen = .diskVisualization
                     case "memoryCleaner": screen = .memoryCleaner
                     case "activityMonitor": screen = .activityMonitor
+                    case "aiSettings":
+                        SettingsNavigation.selectAI()
+                        openSettings()
                     default: break
                     }
                 })

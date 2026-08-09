@@ -192,31 +192,13 @@ struct ScanView: View {
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16),
             ], spacing: 16) {
-                toolCard(
-                    icon: "trash", colors: [.red, .orange],
-                    title: "应用卸载器",
-                    subtitle: "彻底卸载应用及残留文件",
-                    key: "appUninstaller"
-                )
-                toolCard(
-                    icon: "doc.on.doc", colors: [.pink, .purple],
-                    title: "重复文件清理",
-                    subtitle: "查找内容一样的文件",
-                    key: "duplicateFinder"
-                )
-                toolCard(
-                    icon: "chart.pie", colors: [.blue, .cyan],
-                    title: "磁盘空间分析",
-                    subtitle: "深度分析存储情况",
-                    key: "diskVisualization"
-                )
+                ForEach(HomeToolCard.standard.prefix(3)) { card in
+                    toolCard(card)
+                }
                 largeFilesToolCard
-                toolCard(
-                    icon: "waveform.badge.magnifyingglass", colors: [.purple, .indigo],
-                    title: "活动监视器",
-                    subtitle: "查看进程用途，安全终止",
-                    key: "activityMonitor"
-                )
+                ForEach(HomeToolCard.standard.dropFirst(3)) { card in
+                    toolCard(card)
+                }
             }
             .padding(24)
 
@@ -290,19 +272,19 @@ struct ScanView: View {
         .frame(width: 280)
     }
 
-    private func toolCard(icon: String, colors: [Color], title: String, subtitle: String, key: String) -> some View {
+    private func toolCard(_ card: HomeToolCard) -> some View {
         Button {
-            onNavigate?(key)
+            onNavigate?(card.destination.rawValue)
         } label: {
             VStack(spacing: 10) {
-                GradientIconBadge(icon: icon, size: 56, colors: colors)
+                GradientIconBadge(icon: card.icon, size: 56, colors: card.colors)
 
-                Text(title)
+                Text(card.title)
                     .font(.callout)
                     .fontWeight(.semibold)
                     .foregroundStyle(.primary)
 
-                Text(subtitle)
+                Text(card.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
