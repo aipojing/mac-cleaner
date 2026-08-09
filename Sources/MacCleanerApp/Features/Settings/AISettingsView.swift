@@ -31,9 +31,11 @@ struct AISettingsView: View {
 
                     modelConfigurationCard
 
-                    HStack(alignment: .top, spacing: 20) {
-                        cacheCard
-                        privacyCard
+                    Grid(horizontalSpacing: 20, verticalSpacing: 0) {
+                        GridRow {
+                            cacheCard
+                            privacyCard
+                        }
                     }
                 }
                 .frame(maxWidth: 900, alignment: .leading)
@@ -137,7 +139,14 @@ struct AISettingsView: View {
                     }
             }
 
-            configurationField("API Key") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("API Key")
+                        .font(.headline)
+                    Spacer()
+                    Link("获取 API Key", destination: URL(string: "https://platform.deepseek.com/api_keys")!)
+                        .font(.subheadline)
+                }
                 SecureField("输入你的 API Key", text: $viewModel.apiKeyInput)
                     .textFieldStyle(.roundedBorder)
                 HStack(spacing: 8) {
@@ -159,9 +168,6 @@ struct AISettingsView: View {
                     }
                 }
                 .font(.caption)
-                Text("不会写入系统钥匙串；仅保存在这台 Mac 的应用偏好中。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             configurationField("模型名称") {
@@ -228,7 +234,7 @@ struct AISettingsView: View {
                 showClearCacheConfirm = true
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 16))
     }
@@ -237,11 +243,8 @@ struct AISettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("数据与隐私", systemImage: "hand.raised")
                 .font(.headline)
-            Text(Self.privacyText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 16))
     }
