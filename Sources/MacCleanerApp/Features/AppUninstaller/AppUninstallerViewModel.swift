@@ -18,13 +18,19 @@ final class AppUninstallerViewModel {
     var selectedApp: InstalledApp?
     var residuals: AppResidualFiles?
     private var residualTotalsByAppID: [UUID: Int64] = [:]
+    private var residualCacheByAppID: [UUID: AppResidualFiles] = [:]
     var selectedResidualPaths: Set<String> = []
     var searchText = ""
     var report: UninstallReport?
+    private(set) var residualPrefetchCompleted = 0
+    private(set) var residualPrefetchTotal = 0
 
     private let service: any AppUninstalling
     private var loadAppsTask: Task<Void, Never>?
     private var residualsTask: Task<Void, Never>?
+    private var residualPrefetchTask: Task<Void, Never>?
+    private var residualScanTasksByAppID: [UUID: Task<AppResidualFiles, Never>] = [:]
+    private var residualPrefetchGeneration = UUID()
 
     init(service: any AppUninstalling = AppUninstallerService()) {
         self.service = service
@@ -38,26 +44,53 @@ final class AppUninstallerViewModel {
         }
     }
 
+    var isPrefetchingResidualTotals: Bool {
+        residualPrefetchTotal > 0 && residualPrefetchCompleted < residualPrefetchTotal
+    }
+
     func loadApps() {
         // 重入保护：已有扫描在途时直接返回，避免重复扫描乱序写回。
         guard loadAppsTask == nil else { return }
+        stopBackgroundResidualPrefetch()
+        residualTotalsByAppID = [:]
+        residualCacheByAppID = [:]
         phase = .loadingApps
         loadAppsTask = Task {
             let result = await service.scanApplications()
+            guard !Task.isCancelled else { return }
             apps = result
             phase = .ready
             loadAppsTask = nil
+            startBackgroundResidualPrefetch(for: result)
         }
+    }
+
+    /// 仅在卸载器页面可见时按顺序补全各应用的关联文件总计。
+    /// 应用列表先完成展示，后台一次只处理一个应用，避免全盘并行遍历抢占磁盘。
+    func stopBackgroundResidualPrefetch() {
+        residualPrefetchGeneration = UUID()
+        residualPrefetchTask?.cancel()
+        residualPrefetchTask = nil
+        residualPrefetchCompleted = 0
+        residualPrefetchTotal = 0
     }
 
     func selectApp(_ app: InstalledApp) {
         beginSelection(app)
+        if let cached = residualCacheByAppID[app.id] {
+            applyResiduals(cached, for: app)
+            return
+        }
         residualsTask = Task { await loadResiduals(for: app) }
     }
 
     /// 测试入口：同步等待残留扫描完成
     func selectAppForTesting(_ app: InstalledApp) async {
         beginSelection(app)
+        if let cached = residualCacheByAppID[app.id] {
+            applyResiduals(cached, for: app)
+            return
+        }
         await loadResiduals(for: app)
     }
 
@@ -68,22 +101,67 @@ final class AppUninstallerViewModel {
         residualsTask = nil
         selectedApp = app
         residuals = nil
-        residualTotalsByAppID.removeValue(forKey: app.id)
         selectedResidualPaths = []
         report = nil
         phase = .scanningResiduals
     }
 
     private func loadResiduals(for app: InstalledApp) async {
-        let result = await service.findResiduals(for: app)
+        let result = await cachedResiduals(for: app)
         // 身份校验：扫描期间用户已改选其他应用时丢弃过期结果。
         guard !Task.isCancelled, selectedApp == app else { return }
+        applyResiduals(result, for: app)
+    }
+
+    private func applyResiduals(_ result: AppResidualFiles, for app: InstalledApp) {
+        guard selectedApp == app else { return }
         residuals = result
-        residualTotalsByAppID[app.id] = result.totalSize
         // 残留默认不选中，等用户逐项显式勾选；
         // 身份缺失的条目保持未选中且禁止勾选。
         selectedResidualPaths = []
         phase = .ready
+    }
+
+    private func cachedResiduals(for app: InstalledApp) async -> AppResidualFiles {
+        if let cached = residualCacheByAppID[app.id] { return cached }
+
+        let scanTask: Task<AppResidualFiles, Never>
+        if let inFlight = residualScanTasksByAppID[app.id] {
+            scanTask = inFlight
+        } else {
+            let service = service
+            scanTask = Task.detached(priority: .utility) {
+                await service.findResiduals(for: app)
+            }
+            residualScanTasksByAppID[app.id] = scanTask
+        }
+
+        let result = await scanTask.value
+        residualScanTasksByAppID.removeValue(forKey: app.id)
+        residualCacheByAppID[app.id] = result
+        residualTotalsByAppID[app.id] = result.totalSize
+        return result
+    }
+
+    private func startBackgroundResidualPrefetch(for apps: [InstalledApp]) {
+        guard !apps.isEmpty else { return }
+
+        let generation = UUID()
+        residualPrefetchGeneration = generation
+        residualPrefetchCompleted = 0
+        residualPrefetchTotal = apps.count
+
+        residualPrefetchTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            for app in apps {
+                guard !Task.isCancelled, self.residualPrefetchGeneration == generation else { return }
+                _ = await self.cachedResiduals(for: app)
+                guard !Task.isCancelled, self.residualPrefetchGeneration == generation else { return }
+                self.residualPrefetchCompleted += 1
+            }
+            guard self.residualPrefetchGeneration == generation else { return }
+            self.residualPrefetchTask = nil
+        }
     }
 
     func selectAppFromURL(_ url: URL) {
@@ -142,6 +220,7 @@ final class AppUninstallerViewModel {
                 self.report = result
                 self.apps.removeAll { $0.id == app.id }
                 self.residualTotalsByAppID.removeValue(forKey: app.id)
+                self.residualCacheByAppID.removeValue(forKey: app.id)
                 self.selectedApp = nil
                 self.residuals = nil
                 self.phase = .ready

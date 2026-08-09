@@ -39,6 +39,7 @@
 		89CA0BB355148E7521AC67A7 /* AppUninstallerSelectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 896AA947BDEE0424EF3EADC5 /* AppUninstallerSelectionTests.swift */; };
 		8F31F77688CD7776498FDBCF /* ActivityMonitorSearchViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D54AD339D54416978AC1612 /* ActivityMonitorSearchViewModelTests.swift */; };
 		9099C13D7CE40389351A79AD /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F6215F2497E3CC72434579 /* LanguageManager.swift */; };
+		950F168F65BBADE3B59A98A9 /* AppUninstallerRaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB5B6F304090B63FE25424F2 /* AppUninstallerRaceTests.swift */; };
 		954F5CB5DFA012CA5C24ABC8 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32832B6474E1B4C7D897A5F3 /* AppEnvironment.swift */; };
 		95C12F307D908A1F58113FF1 /* PermissionGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C991D6E73A6F077C0E4492F /* PermissionGuideView.swift */; };
 		98D9D8521502885FEF3A526C /* XPCMemoryCleanerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BFBDFEB98C3FE6E53BC8882 /* XPCMemoryCleanerService.swift */; };
@@ -107,7 +108,6 @@
 		56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateFinderViewModelTests.swift; sourceTree = "<group>"; };
 		5E9FEA13FF4D04CCE366BFC4 /* AISettingsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsViewModelTests.swift; sourceTree = "<group>"; };
 		5F360234F741088E16D73950 /* MainWindowFinderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowFinderTests.swift; sourceTree = "<group>"; };
-		64C0875E19C03F5C5B9DC477 /* mac-cleaner-ai-card.TovNea */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mac-cleaner-ai-card.TovNea"; path = .; sourceTree = SOURCE_ROOT; };
 		681B3D02F61B99756C0427D7 /* XPCServiceDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPCServiceDelegate.swift; sourceTree = "<group>"; };
 		7126ADF6B0DC6C5B30DD6C40 /* ResultsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsViewModel.swift; sourceTree = "<group>"; };
 		73B36425FA2D494F1CDC3870 /* MemoryCleanerServiceImpl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCleanerServiceImpl.swift; sourceTree = "<group>"; };
@@ -133,6 +133,7 @@
 		C1B0502916103DE2DC9BE83E /* MemoryCleanerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCleanerView.swift; sourceTree = "<group>"; };
 		C53A7379EA03C6E82FEDDC71 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
 		C81A9D9C3F5EE2F4C623E97A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CB5B6F304090B63FE25424F2 /* AppUninstallerRaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUninstallerRaceTests.swift; sourceTree = "<group>"; };
 		D1C7BC6B172DCE7FCAEA5FB2 /* MainWindowTagger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainWindowTagger.swift; sourceTree = "<group>"; };
 		D69746895E432B318AB56F61 /* MacCleanerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCleanerApp.swift; sourceTree = "<group>"; };
 		D7959C346546C48C62EDC88A /* XPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPCProtocol.swift; sourceTree = "<group>"; };
@@ -147,6 +148,7 @@
 		EE174AC6FBFE2DAF57594143 /* ResultsSearchViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsSearchViewModelTests.swift; sourceTree = "<group>"; };
 		F63AB7848A540423B1886C9D /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		F6B827736F288C70CE937741 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
+		64C0875E19C03F5C5B9DC477 /* mac-cleaner-ai-card.TovNea */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mac-cleaner-ai-card.TovNea"; path = .; sourceTree = SOURCE_ROOT; };
 		FA9FED41A26B782C6643112D /* HomeToolCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeToolCardTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -283,6 +285,7 @@
 				E978F190EA33666CCA93EE64 /* ActivityMonitorAIViewModelTests.swift */,
 				3D54AD339D54416978AC1612 /* ActivityMonitorSearchViewModelTests.swift */,
 				5E9FEA13FF4D04CCE366BFC4 /* AISettingsViewModelTests.swift */,
+				CB5B6F304090B63FE25424F2 /* AppUninstallerRaceTests.swift */,
 				896AA947BDEE0424EF3EADC5 /* AppUninstallerSelectionTests.swift */,
 				56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */,
 				FA9FED41A26B782C6643112D /* HomeToolCardTests.swift */,
@@ -555,6 +558,7 @@
 				C0C9F77E1597D469B0308320 /* ActivityMonitorAIViewModelTests.swift in Sources */,
 				8F31F77688CD7776498FDBCF /* ActivityMonitorSearchViewModelTests.swift in Sources */,
 				28C9795314981AE2E203E223 /* AppAITestDoubles.swift in Sources */,
+				950F168F65BBADE3B59A98A9 /* AppUninstallerRaceTests.swift in Sources */,
 				89CA0BB355148E7521AC67A7 /* AppUninstallerSelectionTests.swift in Sources */,
 				D19A7D266A9BB8DF055E362C /* DuplicateFinderViewModelTests.swift in Sources */,
 				FFFE276838E5625B695CB227 /* HomeToolCardTests.swift in Sources */,

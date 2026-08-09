@@ -23,6 +23,7 @@ struct AppUninstallerView: View {
             }
         }
         .onAppear { viewModel.loadApps() }
+        .onDisappear { viewModel.stopBackgroundResidualPrefetch() }
         .alert("卸载完成", isPresented: .init(
             get: { viewModel.report != nil },
             set: { if !$0 { viewModel.report = nil } }
@@ -84,6 +85,16 @@ struct AppUninstallerView: View {
             .background(.bar)
 
             Divider()
+
+            if viewModel.isPrefetchingResidualTotals {
+                Text("正在后台补全关联文件 \(viewModel.residualPrefetchCompleted)/\(viewModel.residualPrefetchTotal)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                Divider()
+            }
 
             // 列表
             ScrollView {
