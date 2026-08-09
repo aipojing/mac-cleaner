@@ -24,6 +24,31 @@ extension AISettingsViewModel {
 @MainActor
 @Suite("AI settings view model")
 struct AISettingsViewModelTests {
+    @Test("统一保存会同时写入选择的模型和新的 API Key")
+    func savesModelConfigurationAndNewKeyTogether() async throws {
+        let configurationStore = InMemoryDeepSeekConfigurationStore()
+        let keyStore = InMemoryAPIKeyStore()
+        let consentStore = InMemoryAIPrivacyConsentStore(hasConsented: true)
+        let viewModel = AISettingsViewModel.fixture(
+            keyStore: keyStore,
+            consentStore: consentStore,
+            configurationStore: configurationStore
+        )
+        viewModel.modelInput = "deepseek-v4-flash"
+        viewModel.baseURLInput = "https://api.deepseek.com"
+        viewModel.apiKeyInput = "sk-new"
+
+        await viewModel.saveModelConfiguration()
+
+        #expect(configurationStore.configuration() == .init(
+            baseURL: URL(string: "https://api.deepseek.com")!,
+            model: "deepseek-v4-flash"
+        ))
+        #expect(try keyStore.isConfigured())
+        #expect(viewModel.apiKeyInput.isEmpty)
+        #expect(viewModel.isConfigured)
+    }
+
     @Test("保存服务配置会更新模型 ID 和 Base URL")
     func savesServiceConfiguration() throws {
         let configurationStore = InMemoryDeepSeekConfigurationStore()
