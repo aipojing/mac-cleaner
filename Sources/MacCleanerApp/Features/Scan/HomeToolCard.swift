@@ -28,6 +28,13 @@ struct HomeToolCard: Identifiable {
             subtitle: "彻底卸载应用及残留文件"
         ),
         HomeToolCard(
+            destination: .activityMonitor,
+            icon: "waveform.badge.magnifyingglass",
+            colors: [.purple, .indigo],
+            title: "活动监视器",
+            subtitle: "查看进程用途，安全终止"
+        ),
+        HomeToolCard(
             destination: .duplicateFinder,
             icon: "doc.on.doc",
             colors: [.pink, .purple],
@@ -40,13 +47,6 @@ struct HomeToolCard: Identifiable {
             colors: [.blue, .cyan],
             title: "磁盘空间分析",
             subtitle: "深度分析存储情况"
-        ),
-        HomeToolCard(
-            destination: .activityMonitor,
-            icon: "waveform.badge.magnifyingglass",
-            colors: [.purple, .indigo],
-            title: "活动监视器",
-            subtitle: "查看进程用途，安全终止"
         ),
         HomeToolCard(
             destination: .aiSettings,

@@ -192,11 +192,11 @@ struct ScanView: View {
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16),
             ], spacing: 16) {
-                ForEach(HomeToolCard.standard.prefix(3)) { card in
+                ForEach(HomeToolCard.standard.prefix(2)) { card in
                     toolCard(card)
                 }
                 largeFilesToolCard
-                ForEach(HomeToolCard.standard.dropFirst(3)) { card in
+                ForEach(HomeToolCard.standard.dropFirst(2)) { card in
                     toolCard(card)
                 }
             }
