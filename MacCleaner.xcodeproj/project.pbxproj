@@ -55,6 +55,7 @@
 		D19A7D266A9BB8DF055E362C /* DuplicateFinderViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */; };
 		D50A40F5E2E29FEA2E845CD8 /* ScanViewModelLiveResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A53A6EB86342FC2744BCC26B /* ScanViewModelLiveResultsTests.swift */; };
 		D5DB4FD07FF53C705DE6EBFB /* AISettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09205986F2B94BC55260B2FF /* AISettingsView.swift */; };
+		D6EAE5922829F0CAA710C81D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C81A9D9C3F5EE2F4C623E97A /* Assets.xcassets */; };
 		DBC9813F27B831015370492F /* DuplicateFinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0425C907D7C5AEEF78FBDF04 /* DuplicateFinderView.swift */; };
 		EE835B5411C768D9B26F00B0 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77F8EED51D08786F9C23B81B /* AppCommands.swift */; };
 		EF23B14818014A9908864F70 /* DiskVisualizationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E3C52D63F13FC2E139FD97C /* DiskVisualizationViewModel.swift */; };
@@ -118,6 +119,7 @@
 		B8F6215F2497E3CC72434579 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		C1B0502916103DE2DC9BE83E /* MemoryCleanerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryCleanerView.swift; sourceTree = "<group>"; };
 		C53A7379EA03C6E82FEDDC71 /* MenuBarPopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverView.swift; sourceTree = "<group>"; };
+		C81A9D9C3F5EE2F4C623E97A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D69746895E432B318AB56F61 /* MacCleanerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacCleanerApp.swift; sourceTree = "<group>"; };
 		D7959C346546C48C62EDC88A /* XPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPCProtocol.swift; sourceTree = "<group>"; };
 		DD24D0872F72F8D9C2905228 /* ModuleIdentifier+UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ModuleIdentifier+UI.swift"; sourceTree = "<group>"; };
@@ -292,6 +294,7 @@
 		8F9523BB4D351133034840D3 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				C81A9D9C3F5EE2F4C623E97A /* Assets.xcassets */,
 				266F3FC3AE058B2F6F14E7CD /* Localizable.strings */,
 			);
 			path = Resources;
@@ -507,6 +510,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D6EAE5922829F0CAA710C81D /* Assets.xcassets in Resources */,
 				B3D0D8C567BBF92CD9856762 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
