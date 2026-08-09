@@ -127,10 +127,10 @@ struct ActivityMonitorView: View {
                             )
                         }
                     }
-                    Section("AI 建议") {
+                    Section("能否结束") {
                         ForEach(AIRecommendation.allCases, id: \.self) { recommendation in
                             Toggle(
-                                AIAssessmentCard.recommendationLabel(recommendation),
+                                AIAssessmentCard.recommendationLabel(recommendation, context: .process),
                                 isOn: Binding(
                                     get: { viewModel.selectedRecommendations.contains(recommendation) },
                                     set: { isOn in
@@ -150,7 +150,7 @@ struct ActivityMonitorView: View {
                         systemImage: "line.3.horizontal.decrease.circle"
                     )
                 }
-                .help("按 AI 分析状态、风险和建议筛选（不触发分析）")
+                .help("按 AI 分析状态、结束风险和结论筛选（不触发分析）")
 
                 if viewModel.isFiltered {
                     Button {
@@ -172,16 +172,24 @@ struct ActivityMonitorView: View {
                 .help("手动刷新")
 
                 if viewModel.isBatchAnalyzing {
-                    Button("取消分析") {
-                        Task { await viewModel.cancelAIAnalysis() }
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("正在分析 \(viewModel.batchAnalyzingProcessIDs.count) 个进程")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("取消") {
+                            Task { await viewModel.cancelAIAnalysis() }
+                        }
+                        .controlSize(.small)
                     }
-                    .controlSize(.small)
                 } else {
-                    Button("分析未判断进程（\(viewModel.unanalyzedCount)）") {
+                    Button("AI 分析下一批（\(viewModel.nextAnalysisBatchCount)/\(viewModel.unanalyzedCount)）") {
                         Task { await viewModel.analyzeMissingProcesses() }
                     }
                     .controlSize(.small)
                     .disabled(viewModel.unanalyzedCount == 0)
+                    .help("每次最多分析 10 个进程；也可在右侧对当前进程单独分析")
                 }
             }
         }
@@ -335,7 +343,7 @@ struct ActivityMonitorView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("AI 分析中…")
+                    Text("AI 正在判断结束影响…")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Button("取消") {
@@ -352,10 +360,11 @@ struct ActivityMonitorView: View {
                         fromCache: {
                             if case .cached = state { return true }
                             return false
-                        }()
+                        }(),
+                        context: .process
                     )
                     HStack(spacing: 12) {
-                        Button("AI 重新检查") {
+                        Button("AI 重新判断") {
                             Task { await viewModel.reanalyze(proc) }
                         }
                         .font(.callout)
@@ -364,7 +373,7 @@ struct ActivityMonitorView: View {
                     }
                 } else {
                     HStack(spacing: 12) {
-                        Button("AI 分析此进程") {
+                        Button("AI 判断能否结束") {
                             Task { await viewModel.analyze(proc) }
                         }
                         .buttonStyle(.bordered)

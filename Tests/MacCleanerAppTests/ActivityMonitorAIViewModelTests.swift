@@ -52,6 +52,16 @@ extension ActivityMonitorViewModel {
 @MainActor
 @Suite("Activity monitor AI view model")
 struct ActivityMonitorAIViewModelTests {
+    @Test("进程建议标签直接回答能否结束")
+    func recommendationLabelsDescribeTerminationImpact() {
+        #expect(AIAssessmentCard.recommendationLabel(.delete, context: .process) == "可以结束")
+        #expect(AIAssessmentCard.recommendationLabel(.keep, context: .process) == "结束可能有影响")
+        #expect(AIAssessmentCard.recommendationLabel(.inspect, context: .process) == "需确认影响")
+        #expect(AIAssessmentCard.recommendationLabel(.unknown, context: .process) == "无法判断")
+
+        #expect(AIAssessmentCard.recommendationLabel(.keep) == "AI 建议保留")
+    }
+
     @Test("三秒刷新只加载新 fingerprint 的缓存")
     func refreshNeverAnalyzesAutomatically() async {
         let ai = RecordingAIService()
@@ -90,6 +100,37 @@ struct ActivityMonitorAIViewModelTests {
         #expect(await ai.lastForceRefresh == false)
         let state = viewModel.assessmentState(for: process)
         #expect(state?.assessment != nil)
+    }
+
+    @Test("批量分析每次最多提交十个进程")
+    func batchAnalysisOnlySubmitsNextTenProcesses() async throws {
+        let processes = (0..<12).map { index in
+            let pid = Int32(5_000 + index)
+            return RunningProcess.appFixture(
+                pid: pid,
+                name: "Process \(index)",
+                path: "/Applications/Process\(index).app/Contents/MacOS/Process\(index)",
+                identity: ProcessIdentity(
+                    pid: pid,
+                    executablePath: "/Applications/Process\(index).app/Contents/MacOS/Process\(index)",
+                    startTimeTicks: UInt64(10_000 + index),
+                    bundleIdentifier: "com.example.process\(index)"
+                )
+            )
+        }
+        let ai = RecordingAIService(result: try AIAssessment.fixture())
+        let viewModel = await ActivityMonitorViewModel.fixture(
+            aiService: ai,
+            processes: processes
+        )
+
+        await viewModel.analyzeMissingProcesses()
+
+        let analyzedIDs = await ai.analyzedSubjectIDs.flatMap { $0 }
+        #expect(analyzedIDs.count == 10)
+        #expect(viewModel.unanalyzedCount == 2)
+        #expect(viewModel.assessmentState(for: processes[10]) == .notAnalyzed)
+        #expect(viewModel.assessmentState(for: processes[11]) == .notAnalyzed)
     }
 
     @Test("缓存命中展示且不联网")

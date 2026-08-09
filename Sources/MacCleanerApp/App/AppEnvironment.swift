@@ -35,7 +35,8 @@ final class AppEnvironment {
     let assessmentCache: any AIAssessmentCacheStatsProviding
     let deepSeekConfigurationStore: any DeepSeekConfigurationManaging
 
-    /// 设置页状态全局只创建一次，避免重算 body 时丢失正在编辑的服务配置。
+    /// AI 设置 VM 全局只创建一次：SettingsView body 重算时不得重建，
+    /// 否则正在输入的 API Key、连接状态、隐私弹窗状态全部丢失。
     lazy var aiSettingsViewModel = AISettingsViewModel(
         keyStore: apiKeyStore,
         consentStore: privacyConsentStore,

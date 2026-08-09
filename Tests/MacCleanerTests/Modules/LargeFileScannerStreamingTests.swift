@@ -26,8 +26,12 @@ struct LargeFileScannerStreamingTests {
         let root = NSTemporaryDirectory().appending("large-stream-\(UUID().uuidString)")
         try FileManager.default.createDirectory(atPath: root, withIntermediateDirectories: true)
         for (name, size) in files {
-            try Data(repeating: 0xAB, count: size)
-                .write(to: URL(fileURLWithPath: (root as NSString).appendingPathComponent(name)))
+            let fileURL = URL(fileURLWithPath: (root as NSString).appendingPathComponent(name))
+            try FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data(repeating: 0xAB, count: size).write(to: fileURL)
         }
         return root
     }
@@ -92,5 +96,29 @@ struct LargeFileScannerStreamingTests {
 
         #expect(result.items.map(\.path) == ["\(root)/b.bin", "\(root)/a.bin"])
         #expect(result.items.allSatisfy { $0.fileIdentity != nil })
+    }
+
+    @Test(".git/node_modules/Pods 下的大文件不进入结果与实时快照")
+    func repositoryDirectoriesAreExcluded() async throws {
+        let root = try makeFixture(files: [
+            (".git/objects/pack/pack-big.pack", 64 * 1024),
+            ("node_modules/dep/index.js", 64 * 1024),
+            ("Pods/Lib/libSDK.a", 64 * 1024),
+            ("regular.bin", 64 * 1024),
+        ])
+        defer { try? FileManager.default.removeItem(atPath: root) }
+
+        let collector = LargeFileUpdateCollector()
+        let context = ScanContext(onLargeFileUpdate: { collector.append($0) })
+        let result = try await LargeFileScannerModule(
+            scanRoot: root, minAllocatedSize: 1, limit: 50
+        ).scan(context: context)
+
+        // 仓库/依赖目录里的文件删除即损坏工程，绝不能成为候选
+        #expect(result.items.map(\.path) == ["\(root)/regular.bin"])
+        for update in collector.snapshot() {
+            #expect(update.items.allSatisfy { $0.path == "\(root)/regular.bin" })
+        }
+        #expect(collector.snapshot().last?.matchedFileCount == 1)
     }
 }

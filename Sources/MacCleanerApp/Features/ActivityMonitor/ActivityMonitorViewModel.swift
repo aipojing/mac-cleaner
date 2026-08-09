@@ -35,6 +35,8 @@ extension ProcessFetcher: ProcessListFetching, ProcessTerminating {
 @Observable
 @MainActor
 final class ActivityMonitorViewModel {
+    static let analysisBatchSize = 10
+
     enum Phase: Equatable {
         case idle
         case loading
@@ -90,6 +92,7 @@ final class ActivityMonitorViewModel {
     private var fingerprints: [Int32: String] = [:]
     private var subjects: [Int32: AIAssessmentSubject] = [:]
     var isBatchAnalyzing = false
+    private(set) var batchAnalyzingProcessIDs: Set<Int32> = []
 
     // MARK: - Private
 
@@ -98,6 +101,7 @@ final class ActivityMonitorViewModel {
     private let aiService: any AIAnalysisServing
     private let subjectFactory: AIAssessmentSubjectFactory
     private var refreshTask: Task<Void, Never>?
+    private var analysisGeneration: UInt64 = 0
 
     init(
         fetcher: any ProcessListFetching = ProcessFetcher(),
@@ -212,6 +216,12 @@ final class ActivityMonitorViewModel {
                 return false
             }
         }.count
+    }
+
+    /// 顶部按钮本次实际提交的数量，避免把整个进程列表
+    /// 一次性变成无反馈的加载状态。
+    var nextAnalysisBatchCount: Int {
+        min(unanalyzedCount, Self.analysisBatchSize)
     }
 
     /// 按进程查询 AI 状态。
@@ -335,9 +345,11 @@ final class ActivityMonitorViewModel {
         updateFilteredProcesses()
     }
 
-    /// 用户点击批量按钮：只分析未判断进程，已有缓存不重查。
+    /// 用户点击批量按钮：每次最多分析下一批 10 个未判断进程，
+    /// 已有缓存不重查，批次外进程仍可单独分析。
     func analyzeMissingProcesses() async {
-        let targets = processes.compactMap { process -> AIAssessmentSubject? in
+        guard !isBatchAnalyzing else { return }
+        let targets = Array(processes.compactMap { process -> AIAssessmentSubject? in
             guard let subject = subjects[process.id] else { return nil }
             switch assessmentStates[subject.fingerprint] {
             case .notAnalyzed, .none:
@@ -347,35 +359,45 @@ final class ActivityMonitorViewModel {
             default:
                 return nil
             }
-        }
+        }.prefix(Self.analysisBatchSize))
         guard !targets.isEmpty else { return }
 
+        let generationAtStart = analysisGeneration
         isBatchAnalyzing = true
+        batchAnalyzingProcessIDs = Set(targets.compactMap { subject in
+            subjects.first { $0.value.subjectID == subject.subjectID }?.key
+        })
         for subject in targets {
             assessmentStates[subject.fingerprint] = .loading(
                 previous: assessmentStates[subject.fingerprint]?.assessment
             )
         }
         let states = await aiService.analyze(targets, forceRefresh: false)
+        guard generationAtStart == analysisGeneration else { return }
         for subject in targets {
             if let state = states[subject.subjectID] {
                 assessmentStates[subject.fingerprint] = state
+            } else {
+                assessmentStates[subject.fingerprint] = .notAnalyzed
             }
         }
         isBatchAnalyzing = false
+        batchAnalyzingProcessIDs.removeAll()
         updateFilteredProcesses()
     }
 
     /// 用户取消批量分析：停止后续批次。
     func cancelAIAnalysis() async {
-        await aiService.cancelCurrentAnalysis()
+        analysisGeneration &+= 1
         isBatchAnalyzing = false
+        batchAnalyzingProcessIDs.removeAll()
         for (fingerprint, state) in assessmentStates {
             if case let .loading(previous) = state {
                 assessmentStates[fingerprint] = previous.map { .cached($0) } ?? .notAnalyzed
             }
         }
         updateFilteredProcesses()
+        await aiService.cancelCurrentAnalysis()
     }
 
     // MARK: - 终止（始终经过本地 guard，AI 结果只作解释信息）

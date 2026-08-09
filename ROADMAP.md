@@ -98,16 +98,16 @@
 
 ---
 
-## v3.0 — 平台化 + 自动化 ✅ 已完成
+## v3.0 — 平台化 + 自动化 ✅ 已完成（P2 规则包除外，仍为规划项）
 
 > 目标：从工具变为常驻服务
 
 ### P0 — 可保存清理方案
 
-- `CleaningProfile` 模型：name、moduleIDs、maxRiskLevel、onlyRecommended
-- 4 个内置方案：开发环境瘦身、发版前清理、仅安全项、日志清理
+- `CleaningProfile` 模型：name、moduleIDs、isBuiltIn、icon（无条目级筛选字段；规划中的 maxRiskLevel/onlyRecommended 因无风险判断依据而未实现）
+- 3 个内置方案：开发环境瘦身、发版前清理、日志清理（"仅安全项"方案未实现——无 AI/本地判断时无法兑现条目级语义）
 - `ProfileManager` actor：用户自定义方案 CRUD + JSON 持久化
-- CLI 集成：`--profile "方案名"` 和 `--list-profiles`
+- CLI 集成：`--profile "方案名"` 和 `--list-profiles`；"所有模块"的方案与 `--all` 均默认排除大文件等用户数据模块
 
 ### P1 — 定时扫描 + 菜单栏提醒
 
@@ -115,11 +115,11 @@
 - `ScheduledScanService` actor：后台周期扫描 + 低磁盘通知（UserNotifications）
 - `MenuBarViewModel` 增强：显示可回收空间、定时扫描开关
 
-### P2 — 可扩展规则包
+### P2 — 可扩展规则包（规划中，未实现）
 
-- `RulesProvider` 新增加载 `~/.config/maccleaner/rules.d/*.json`
-- 用户规则优先级最高，覆盖内置和远程规则
-- `ensureUserRulesDirectory()` 工具方法
+- ~~`RulesProvider` 新增加载 `~/.config/maccleaner/rules.d/*.json`~~（代码中不存在 RulesProvider 与用户规则目录加载，仅保留为规划项）
+- ~~用户规则优先级最高，覆盖内置和远程规则~~（未实现）
+- ~~`ensureUserRulesDirectory()` 工具方法~~（未实现）
 
 ### P3 — 磁盘可视化闭环
 
@@ -151,18 +151,12 @@
 - 终止按钮分级：critical 禁止、dangerous 警告、safe/caution 正常
 - `kill()` 安全防护：`guard pid > 0` 防止误杀全局进程
 
-### P1 — 内存清理
-
-- 内存使用实时监控（`MemoryMonitor`）
-- XPC 特权助手清理 + AppleScript fallback
-- 清理前后内存对比展示
-
-### P2 — Android SDK 模块
+### P1 — Android SDK 模块
 
 - platforms / build-tools / NDK / system-images / AVD 扫描
 - 按组件类型分组，标注版本和大小
 
-### P3 — 大文件智能分类
+### P2 — 大文件智能分类
 
 - 构建产物 / 安装包 / 压缩包 / 日志自动识别
 - 按风险等级分类：构建产物标 safe，用户文件标 destructive
@@ -186,5 +180,5 @@
 v1.0  安全和一致性（删除语义对齐 + 排除规则 + 权限诊断 + 测试）  ← ✅ 已完成
 v2.0  高价值覆盖（补缓存缺口 + Xcode/Docker + 卸载器 + 重复文件策略 + 历史趋势）  ← ✅ 已完成
 v3.0  平台化（清理方案 + 定时扫描 + 可扩展规则 + 系统日志 + 可视化闭环）  ← ✅ 已完成
-v3.5  系统工具箱（活动监视器 + 内存清理 + Android SDK + 大文件智能分类）  ← ✅ 已完成
+v3.5  系统工具箱（活动监视器 + Android SDK + 大文件智能分类）  ← ✅ 已完成
 ```

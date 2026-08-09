@@ -3,31 +3,45 @@ import Foundation
 public struct DiskTreeBuilder: Sendable {
     public init() {}
 
-    /// 用 fts 构建深度有限的目录树
+    /// 用 fts 构建深度有限的目录树。
+    /// 在调用任务上下文中执行（继承取消与优先级）：页面关闭取消任务后，
+    /// 许可等待立即抛 CancellationError，遍历循环也会在下一轮中止。
+    /// 取消或失败时返回空根节点（调用方是正在关闭的页面，无需错误细节）。
     public func buildTree(at path: String, maxDepth: Int = 3) async -> DirectoryNode {
-        await Task.detached(priority: .userInitiated) {
-            self.buildTreeSync(at: path, maxDepth: maxDepth)
-        }.value
+        do {
+            return try await buildTreeFTS(at: path, maxDepth: maxDepth)
+        } catch {
+            return DirectoryNode(
+                name: (path as NSString).lastPathComponent,
+                path: path,
+                size: 0,
+                children: []
+            )
+        }
     }
 
     /// 单次 fts 遍历构建目录树：自底向上累计每个目录的 allocated size，
     /// 不再对每个子目录重复遍历其子树（旧实现是 O(深度) 次全树遍历）。
-    /// 整个遍历只占用一个 FTSTraversalGate 许可。
-    private func buildTreeSync(at rootPath: String, maxDepth: Int) -> DirectoryNode {
+    /// 整个遍历只占用一个 FTSTraversalGate 许可；可取消。
+    private func buildTreeFTS(at rootPath: String, maxDepth: Int) async throws -> DirectoryNode {
         let skipNames: Set<String> = [".Trash", ".Spotlight-V100", ".fseventsd"]
         let rootName = (rootPath as NSString).lastPathComponent
 
         // 遍历结果：所有目录的完整大小 + maxDepth 范围内的直接子项记录
-        var dirSizes: [String: Int64] = [:]
-        var childRecords: [String: [(name: String, path: String, isDir: Bool, size: Int64)]] = [:]
+        struct TraversalResult {
+            var dirSizes: [String: Int64] = [:]
+            var childRecords: [String: [(name: String, path: String, isDir: Bool, size: Int64)]] = [:]
+        }
 
-        FTSTraversalGate.withPermit {
+        let traversal = try await FTSTraversalGate.withPermit { () throws -> TraversalResult in
+            var result = TraversalResult()
+
             let cPath = rootPath.withCString { strdup($0) }
-            guard let cPath else { return }
+            guard let cPath else { return result }
             defer { free(cPath) }
 
             var paths: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
-            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR, nil) else { return }
+            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR, nil) else { return result }
             defer { fts_close(fts) }
 
             // 目录帧栈：文件大小先入当前目录帧，目录收尾时向父帧传播
@@ -36,6 +50,8 @@ public struct DiskTreeBuilder: Sendable {
             let progress = ScanProgress.shared
 
             while let entry = fts_read(fts) {
+                if Task.isCancelled { throw CancellationError() }
+
                 let info = entry.pointee.fts_info
                 let path = String(cString: entry.pointee.fts_path)
                 let level = Int(entry.pointee.fts_level)
@@ -49,13 +65,13 @@ public struct DiskTreeBuilder: Sendable {
                     }
                     if level > 0 && level - 1 <= maxDepth {
                         let parent = (path as NSString).deletingLastPathComponent
-                        childRecords[parent, default: []].append((name, path, true, 0))
+                        result.childRecords[parent, default: []].append((name, path, true, 0))
                     }
                     frames.append((path, 0))
 
                 case FTS_DP:
                     if let frame = frames.popLast() {
-                        dirSizes[frame.path] = frame.size
+                        result.dirSizes[frame.path] = frame.size
                         if !frames.isEmpty {
                             frames[frames.count - 1].size += frame.size
                         }
@@ -74,7 +90,7 @@ public struct DiskTreeBuilder: Sendable {
                     if level - 1 <= maxDepth {
                         let parent = (path as NSString).deletingLastPathComponent
                         let name = (path as NSString).lastPathComponent
-                        childRecords[parent, default: []].append((name, path, false, size))
+                        result.childRecords[parent, default: []].append((name, path, false, size))
                     }
                     progress.report(path: path)
 
@@ -83,7 +99,11 @@ public struct DiskTreeBuilder: Sendable {
                     continue
                 }
             }
+            return result
         }
+
+        let dirSizes = traversal.dirSizes
+        let childRecords = traversal.childRecords
 
         guard dirSizes[rootPath] != nil else {
             return DirectoryNode(name: rootName, path: rootPath, size: 0, children: [])

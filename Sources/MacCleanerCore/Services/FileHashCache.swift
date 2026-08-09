@@ -7,6 +7,11 @@ import Foundation
 /// 任何一个变化都会得到不同的键，自然失效。符号链接、目录和无法获得
 /// 稳定身份的对象不进入缓存（每次直接计算）。最多 50,000 条，LRU 淘汰；
 /// 原子写入避免中途崩溃留下半个文件。
+///
+/// 落盘策略：不再每次 miss 后全量写入（O(n²) IO）——每累计
+/// `persistInterval` 个新条目批量落盘一次，或由调用方在扫描阶段结束等
+/// 显式 flush 点调用 `flush()`。LRU 用双向链表维护，命中路径的 touch
+/// 与淘汰都是 O(1)。
 public actor FileHashCache {
     public struct Entry: Codable, Sendable {
         public let sha256: String
@@ -26,24 +31,49 @@ public actor FileHashCache {
 
     public static let schemaVersion = 1
     public static let defaultCapacity = 50_000
+    /// 默认每 64 个新条目批量落盘一次。
+    public static let defaultPersistInterval = 64
 
     private let fileURL: URL
     private let hasher: any FileHashComputing
     private let capacity: Int
+    private let persistInterval: Int
     private var entries: [String: Entry]
-    private var accessOrder: [String]
+    /// 自上次落盘以来的新条目数。
+    private var unsavedInserts = 0
+
+    // LRU 双向链表：head 最旧、tail 最新；nodes 提供 O(1) 定位。
+    private final class Node {
+        let key: String
+        var prev: Node?
+        var next: Node?
+        init(key: String) { self.key = key }
+    }
+    private var nodes: [String: Node] = [:]
+    private var head: Node?
+    private var tail: Node?
 
     public init(
         fileURL: URL = FileHashCache.defaultFileURL(),
         hasher: any FileHashComputing = FileHasher(),
-        capacity: Int = FileHashCache.defaultCapacity
+        capacity: Int = FileHashCache.defaultCapacity,
+        persistInterval: Int = FileHashCache.defaultPersistInterval
     ) {
         self.fileURL = fileURL
         self.hasher = hasher
         self.capacity = max(1, capacity)
+        self.persistInterval = max(1, persistInterval)
         let store = Self.load(from: fileURL)
         self.entries = store.entries
-        self.accessOrder = store.accessOrder
+        // init 是非隔离上下文，不能直接调用隔离的 appendToTail，内联建链
+        for key in store.accessOrder {
+            let node = Node(key: key)
+            node.prev = tail
+            tail?.next = node
+            tail = node
+            if head == nil { head = node }
+            nodes[key] = node
+        }
     }
 
     public static func defaultFileURL() -> URL {
@@ -75,27 +105,75 @@ public actor FileHashCache {
         entries[key] = Entry(sha256: hash, computedAt: Date())
         touch(key)
         evictIfNeeded()
-        persist()
+        unsavedInserts += 1
+        if unsavedInserts >= persistInterval {
+            flush()
+        }
         return hash
+    }
+
+    /// 显式落盘点：扫描阶段结束等时机调用，把累计的新条目写盘。
+    public func flush() {
+        guard unsavedInserts > 0 else { return }
+        unsavedInserts = 0
+        persist()
     }
 
     /// 当前缓存条数（测试与诊断用）。
     public var count: Int { entries.count }
 
-    private func touch(_ key: String) {
-        accessOrder.removeAll { $0 == key }
-        accessOrder.append(key)
-    }
+    // MARK: - LRU（O(1) touch / evict）
 
-    private func evictIfNeeded() {
-        while entries.count > capacity, let oldest = accessOrder.first {
-            accessOrder.removeFirst()
-            entries[oldest] = nil
+    private func touch(_ key: String) {
+        if let node = nodes[key] {
+            detach(node)
+            appendToTail(node)
+        } else {
+            appendToTail(Node(key: key))
         }
     }
 
+    private func detach(_ node: Node) {
+        node.prev?.next = node.next
+        node.next?.prev = node.prev
+        if head === node { head = node.next }
+        if tail === node { tail = node.prev }
+        node.prev = nil
+        node.next = nil
+    }
+
+    private func appendToTail(_ node: Node) {
+        node.prev = tail
+        node.next = nil
+        tail?.next = node
+        tail = node
+        if head == nil { head = node }
+        nodes[node.key] = node
+    }
+
+    private func evictIfNeeded() {
+        while entries.count > capacity, let oldest = head {
+            detach(oldest)
+            nodes[oldest.key] = nil
+            entries[oldest.key] = nil
+        }
+    }
+
+    // MARK: - 持久化
+
+    private func accessOrder() -> [String] {
+        var order: [String] = []
+        order.reserveCapacity(entries.count)
+        var node = head
+        while let current = node {
+            order.append(current.key)
+            node = current.next
+        }
+        return order
+    }
+
     private func persist() {
-        let store = Store(entries: entries, accessOrder: accessOrder)
+        let store = Store(entries: entries, accessOrder: accessOrder())
         guard let data = try? JSONEncoder().encode(store) else { return }
         let dir = fileURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

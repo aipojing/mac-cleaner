@@ -5,15 +5,21 @@ public struct DeletionPolicy: Sendable {
     public let allowedRoots: [String]
     public let protectedExactPaths: [String]
     public let protectedSubtrees: [String]
+    /// 删除前是否强制校验内容未漂移（mtime + size 与扫描快照一致）。
+    /// 只对"删错版本代价高"的模块（large-files）开启；缓存类模块内容
+    /// 合法变化频繁，开启只会推高失败率，因此默认关闭。
+    public let rejectOnContentDrift: Bool
 
     public init(
         allowedRoots: [String],
         protectedExactPaths: [String],
-        protectedSubtrees: [String]
+        protectedSubtrees: [String],
+        rejectOnContentDrift: Bool = false
     ) {
         self.allowedRoots = allowedRoots
         self.protectedExactPaths = protectedExactPaths
         self.protectedSubtrees = protectedSubtrees
+        self.rejectOnContentDrift = rejectOnContentDrift
     }
 }
 
@@ -47,7 +53,10 @@ public struct DeletionPolicyCatalog: DeletionPolicyProviding {
         DeletionPolicy(
             allowedRoots: allowedRoots(for: module),
             protectedExactPaths: protectedExactPaths,
-            protectedSubtrees: protectedSubtrees
+            protectedSubtrees: protectedSubtrees,
+            // 大文件删除不可恢复且用户按内容挑选，扫描后内容漂移必须拒删；
+            // 其他模块（缓存/日志等）内容合法变化频繁，不强制。
+            rejectOnContentDrift: module == .largeFiles
         )
     }
 
@@ -100,6 +109,9 @@ public struct DeletionPolicyCatalog: DeletionPolicyProviding {
             return [
                 "\(home)/Library/Containers/com.docker.docker/Data",
                 "\(home)/.docker/buildx",
+                // DockerModule 同时产出这两个应用缓存候选，策略表必须与扫描范围对齐
+                "\(home)/Library/Caches/com.docker.docker",
+                "\(home)/Library/Caches/Docker",
             ]
         case .systemLogs:
             return [

@@ -34,7 +34,8 @@ final class ScanViewModel {
     }
 
     private var scanTask: Task<Void, Never>?
-    private var pathPollTask: Task<Void, Never>?
+    /// 路径轮询任务；`private(set)` 仅供测试观察取消状态。
+    private(set) var pathPollTask: Task<Void, Never>?
 
     var availableModules: [any CleanerModule] {
         ModuleRegistry.availableModules()
@@ -44,6 +45,7 @@ final class ScanViewModel {
         largeFileMinimumAllocatedSize: Int64 = LargeFileScannerModule.defaultMinimumAllocatedSize
     ) {
         scanTask?.cancel()
+        stopPathPolling()
         results = []
         clearLiveLargeFileResults()
 
@@ -55,7 +57,7 @@ final class ScanViewModel {
         logger.notice("startScan()")
 
         // 定期从 ScanProgress 读取当前扫描路径
-        pathPollTask = Task {
+        let pollTask = Task {
             while !Task.isCancelled {
                 let path = ScanProgress.shared.currentPath
                 if !path.isEmpty {
@@ -64,6 +66,7 @@ final class ScanViewModel {
                 try? await Task.sleep(for: .milliseconds(100))
             }
         }
+        pathPollTask = pollTask
 
         scanTask = Task {
             let modules = ModuleRegistry.modules(
@@ -73,6 +76,7 @@ final class ScanViewModel {
                 .filter { $0.isAvailable() }
 
             guard !modules.isEmpty else {
+                stopPathPolling(pollTask)
                 phase = .failed("没有可用的清理模块")
                 return
             }
@@ -121,15 +125,20 @@ final class ScanViewModel {
             do {
                 scanned = try await coordinator.scan()
             } catch {
+                // 无论是否已取消，失败路径都必须停掉轮询，避免泄漏永久任务。
+                stopPathPolling(pollTask)
                 guard !Task.isCancelled else { return }
                 clearLiveLargeFileResults()
                 phase = .failed(error.localizedDescription)
                 return
             }
 
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                stopPathPolling(pollTask)
+                return
+            }
 
-            pathPollTask?.cancel()
+            stopPathPolling(pollTask)
             currentScanPath = ""
             clearLiveLargeFileResults()
 
@@ -171,20 +180,35 @@ final class ScanViewModel {
 
     func cancel() {
         scanTask?.cancel()
-        pathPollTask?.cancel()
+        stopPathPolling()
         clearLiveLargeFileResults()
         phase = .idle
     }
 
     func reset() {
         scanTask?.cancel()
-        pathPollTask?.cancel()
+        stopPathPolling()
         results = []
         completedModules = []
         totalDiscoveredSize = 0
         currentScanPath = ""
         clearLiveLargeFileResults()
         phase = .idle
+    }
+
+    /// 取消当前路径轮询任务并清空引用。
+    private func stopPathPolling() {
+        pathPollTask?.cancel()
+        pathPollTask = nil
+    }
+
+    /// 只取消本次扫描自己的轮询任务；若引用已被下一次扫描替换则不动，
+    /// 避免旧扫描任务的收尾误取消新扫描的轮询。
+    private func stopPathPolling(_ task: Task<Void, Never>) {
+        task.cancel()
+        if pathPollTask == task {
+            pathPollTask = nil
+        }
     }
 
     /// 应用核心层已限频的实时快照；同步扫描页统计，但绝不写入正式 results。

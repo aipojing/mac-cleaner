@@ -61,6 +61,9 @@ public struct ProcessFingerprintInput: Equatable, Sendable {
 /// 字段顺序无关，tags 排序去重，时间统一为毫秒，保证跨扫描稳定。
 public struct AIFingerprintGenerator: Sendable {
     public static let schemaVersion = 1
+    /// 进程分析从泛化的“保留建议”改为“结束影响”后单独升级，
+    /// 避免复用旧语义下的缓存结论，同时不使清理项缓存失效。
+    public static let processSchemaVersion = 2
 
     public init() {}
 
@@ -124,7 +127,7 @@ private struct ProcessPayload: Encodable {
     let signedByApple: Bool?
 
     init(input: ProcessFingerprintInput) {
-        schemaVersion = AIFingerprintGenerator.schemaVersion
+        schemaVersion = AIFingerprintGenerator.processSchemaVersion
         pid = input.pid
         executablePath = CleanupPayload.normalizedPath(input.executablePath)
         bundleIdentifier = input.bundleIdentifier

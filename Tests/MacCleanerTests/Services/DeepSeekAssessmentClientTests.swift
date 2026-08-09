@@ -67,6 +67,30 @@ struct DeepSeekAssessmentClientTests {
         #expect(first.model == "deepseek-v4-pro")
     }
 
+    @Test("进程分析直接判断结束影响而非是否值得保留")
+    func processPromptFocusesOnTerminationImpact() async throws {
+        let subject = AIAssessmentSubject.processFixture()
+        let transport = MockHTTPTransport(
+            response: .validToolResponse(
+                subjectID: subject.subjectID,
+                fingerprint: subject.fingerprint
+            )
+        )
+        let client = DeepSeekAssessmentClient(
+            keyStore: InMemoryAPIKeyStore(key: "sk-secret"),
+            transport: transport
+        )
+
+        _ = try await client.assess([subject])
+
+        let request = try #require(await transport.lastRequest)
+        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        #expect(body.contains("核心问题是现在结束它会有什么影响"))
+        #expect(body.contains("recommendation=delete 表示可以结束"))
+        #expect(body.contains("不要因为进程属于正常应用就默认返回 keep"))
+        #expect(body.contains("网页重载、任务中断或未保存状态"))
+    }
+
     @Test(arguments: [401, 403])
     func mapsAuthenticationFailures(status: Int) async {
         let client = DeepSeekAssessmentClient.fixture(status: status)
@@ -176,7 +200,7 @@ struct DeepSeekAssessmentClientTests {
 }
 
 
-@Suite("DeepSeek tool call configuration")
+@Suite("DeepSeek 工具调用配置")
 struct DeepSeekToolCallConfigurationTests {
     @Test("默认基础地址使用公开 Chat API")
     func defaultBaseURLUsesPublicChatAPI() {

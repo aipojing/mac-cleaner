@@ -147,4 +147,36 @@ struct DeletionGuardTests {
         )
         #expect(result == identity)
     }
+
+    @Test("validatedTarget 返回解析符号链接父目录后的规范化路径")
+    func validatedTargetReturnsCanonicalPath() throws {
+        let fm = FileManager.default
+        let base = (NSTemporaryDirectory() as NSString)
+            .appendingPathComponent("guard-canonical-\(UUID().uuidString)")
+        let real = (base as NSString).appendingPathComponent("real")
+        try fm.createDirectory(atPath: real, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: base) }
+        let file = (real as NSString).appendingPathComponent("cache.bin")
+        fm.createFile(atPath: file, contents: Data(count: 8))
+        let alias = (base as NSString).appendingPathComponent("alias")
+        try fm.createSymbolicLink(atPath: alias, withDestinationPath: real)
+
+        let provider = POSIXFileIdentityProvider()
+        let identity = try provider.identity(at: file)
+        let guardrail = DeletionGuard(
+            allowedRoots: [real],
+            identityProvider: provider,
+            protectedExactPaths: ["/"],
+            protectedSubtrees: ["/System"]
+        )
+
+        let target = try guardrail.validatedTarget(
+            path: (alias as NSString).appendingPathComponent("cache.bin"),
+            expectedIdentity: identity
+        )
+        #expect(target.identity == identity)
+        // canonicalPath 必须指向解析符号链接后的真实位置
+        #expect(target.canonicalPath == provider.resolvedPath(file))
+        #expect(!target.canonicalPath.contains("/alias/"))
+    }
 }

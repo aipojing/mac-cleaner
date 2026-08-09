@@ -220,7 +220,7 @@ struct CleanupView: View {
         case .fileInUse: return "person.fill"
         case .notFound: return "questionmark.circle"
         case .diskFull: return "externaldrive.fill"
-        case .unsafeTarget, .identityChanged, .identityUnavailable:
+        case .unsafeTarget, .identityChanged, .identityUnavailable, .contentModified:
             return "shield.slash.fill"
         case .unknown: return "exclamationmark.circle"
         }

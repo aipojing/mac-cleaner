@@ -13,24 +13,6 @@ packages:
     path: .
 
 targets:
-  helper:
-    type: tool
-    platform: macOS
-    sources:
-      - path: helper
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.maccleaner.helper
-        SWIFT_VERSION: "5.9"
-        MACOSX_DEPLOYMENT_TARGET: "14.0"
-        ENABLE_HARDENED_RUNTIME: true
-        CODE_SIGN_STYLE: Automatic
-      configs:
-        Debug:
-          CODE_SIGN_IDENTITY: "-"
-        Release:
-          CODE_SIGN_IDENTITY: "Apple Development"
-
   MacCleanerAppTests:
     type: bundle.unit-test
     platform: macOS
@@ -73,7 +55,9 @@ targets:
         Debug:
           CODE_SIGN_IDENTITY: "-"
         Release:
-          CODE_SIGN_IDENTITY: "Apple Development"
+          # 与 Debug 一致使用 ad-hoc 签名，无证书的开发机也能构建；
+          # 需要分发时由构建者覆盖 CODE_SIGN_IDENTITY。
+          CODE_SIGN_IDENTITY: "-"
     entitlements:
       path: MacCleanerApp/MacCleaner.entitlements
     info:

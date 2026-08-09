@@ -24,6 +24,12 @@ public struct CleanableItem: Identifiable, Sendable {
     /// 发现该候选的所有模块（按固定优先级排序）。主 category 是第一个元素；
     /// 跨模块重复路径合并后保留全部来源，供筛选和 AI evidence 使用。
     public let sourceModules: [ModuleIdentifier]
+    /// 记录身份时同步捕获的内容指纹：lstat 的 st_mtimespec（纳秒）。
+    /// 不参与 FileIdentity 判等（硬链接去重不受影响）；仅供删除前的
+    /// 内容漂移检测。nil 表示未捕获（旧构造点或读取失败），漂移检测跳过。
+    public let recordedModificationNanoseconds: Int64?
+    /// 记录身份时同步捕获的 lstat st_size（逻辑大小），用途同上。
+    public let recordedContentSize: Int64?
 
     /// 事实初始化器：扫描模块的唯一入口。只记录可验证事实，
     /// 不做风险或推荐判断。
@@ -37,7 +43,9 @@ public struct CleanableItem: Identifiable, Sendable {
         fileIdentity: FileIdentity? = nil,
         allocatedSize: Int64? = nil,
         linkCount: UInt64 = 1,
-        sourceModules: [ModuleIdentifier]? = nil
+        sourceModules: [ModuleIdentifier]? = nil,
+        recordedModificationNanoseconds: Int64? = nil,
+        recordedContentSize: Int64? = nil
     ) {
         self.id = UUID()
         self.path = path
@@ -50,9 +58,13 @@ public struct CleanableItem: Identifiable, Sendable {
         self.fileIdentity = fileIdentity
         self.linkCount = linkCount
         self.sourceModules = Self.normalizedSourceModules(sourceModules ?? [category])
+        self.recordedModificationNanoseconds = recordedModificationNanoseconds
+        self.recordedContentSize = recordedContentSize
     }
 
     /// 内部完整初始化器：复制或合并条目时保留同一 id。
+    /// 内容指纹字段给默认值以保持既有调用点（如 CandidateMerger）兼容；
+    /// 合并条目未传递时指纹为 nil，漂移检测对该条目跳过。
     init(
         id: UUID,
         path: String,
@@ -64,7 +76,9 @@ public struct CleanableItem: Identifiable, Sendable {
         evidenceTags: [String],
         fileIdentity: FileIdentity?,
         linkCount: UInt64,
-        sourceModules: [ModuleIdentifier]
+        sourceModules: [ModuleIdentifier],
+        recordedModificationNanoseconds: Int64? = nil,
+        recordedContentSize: Int64? = nil
     ) {
         self.id = id
         self.path = path
@@ -77,9 +91,11 @@ public struct CleanableItem: Identifiable, Sendable {
         self.fileIdentity = fileIdentity
         self.linkCount = linkCount
         self.sourceModules = sourceModules
+        self.recordedModificationNanoseconds = recordedModificationNanoseconds
+        self.recordedContentSize = recordedContentSize
     }
 
-    /// 返回带指定身份的副本（同一 id）。
+    /// 返回带指定身份的副本（同一 id），保留已有内容指纹。
     public func withFileIdentity(_ identity: FileIdentity?) -> CleanableItem {
         CleanableItem(
             id: id,
@@ -92,25 +108,68 @@ public struct CleanableItem: Identifiable, Sendable {
             evidenceTags: evidenceTags,
             fileIdentity: identity,
             linkCount: linkCount,
-            sourceModules: sourceModules
+            sourceModules: sourceModules,
+            recordedModificationNanoseconds: recordedModificationNanoseconds,
+            recordedContentSize: recordedContentSize
         )
     }
 
-    /// 扫描阶段记录文件身份。已有身份时不重复读取；
+    /// 返回带指定身份与内容指纹的副本（同一 id）。
+    private func withRecordedSnapshot(
+        identity: FileIdentity?,
+        modificationNanoseconds: Int64?,
+        contentSize: Int64?
+    ) -> CleanableItem {
+        CleanableItem(
+            id: id,
+            path: path,
+            displayName: displayName,
+            size: size,
+            allocatedSize: allocatedSize,
+            category: category,
+            subcategory: subcategory,
+            evidenceTags: evidenceTags,
+            fileIdentity: identity,
+            linkCount: linkCount,
+            sourceModules: sourceModules,
+            recordedModificationNanoseconds: modificationNanoseconds,
+            recordedContentSize: contentSize
+        )
+    }
+
+    /// 扫描阶段记录文件身份，并同步捕获内容指纹（mtime 纳秒 + size）
+    /// 供删除前的内容漂移检测。已有身份时不重复读取；
     /// 读取失败（路径不存在、权限不足等）时返回 fileIdentity == nil 的副本，
     /// 可以展示，但删除 guard 会拒绝执行。
     public func recordingIdentity(via provider: any FileIdentityProviding) -> CleanableItem {
         guard fileIdentity == nil else { return self }
-        let identity = try? provider.identity(at: path)
-        return withFileIdentity(identity)
+        guard let identity = try? provider.identity(at: path) else {
+            return withRecordedSnapshot(identity: nil, modificationNanoseconds: nil, contentSize: nil)
+        }
+        // 该协议只提供身份；指纹经 POSIX lstat 尽力捕获，失败保持 nil
+        // （测试桩的虚拟路径不影响确定性，漂移检测会跳过该条目）。
+        let metadata = try? POSIXFileMetadataProvider().metadataSync(
+            at: POSIXFileMetadataProvider.normalized(path)
+        )
+        return withRecordedSnapshot(
+            identity: identity,
+            modificationNanoseconds: metadata?.modificationTimeNanoseconds,
+            contentSize: metadata?.logicalSize
+        )
     }
 
-    /// 经共享元数据索引记录身份：同一路径在索引生命周期内最多 lstat 一次。
-    /// 语义与 `recordingIdentity(via: FileIdentityProviding)` 一致。
+    /// 经共享元数据索引记录身份与内容指纹：同一路径在索引生命周期内最多
+    /// lstat 一次。语义与 `recordingIdentity(via: FileIdentityProviding)` 一致。
     public func recordingIdentity(via index: FileMetadataIndex) async -> CleanableItem {
         guard fileIdentity == nil else { return self }
-        let identity = try? await index.metadata(at: path).identity
-        return withFileIdentity(identity)
+        guard let metadata = try? await index.metadata(at: path) else {
+            return withRecordedSnapshot(identity: nil, modificationNanoseconds: nil, contentSize: nil)
+        }
+        return withRecordedSnapshot(
+            identity: metadata.identity,
+            modificationNanoseconds: metadata.modificationTimeNanoseconds,
+            contentSize: metadata.logicalSize
+        )
     }
 
     /// 标签规范化：去空白、去空、去重、按字典序固定。
