@@ -14,10 +14,12 @@ final class ScanViewModel {
         case failed(String)
     }
 
-    var phase: Phase = .idle
-    var selectedModuleIDs: Set<ModuleIdentifier> = Set(
+    static let standardModuleIDs: Set<ModuleIdentifier> = Set(
         ModuleIdentifier.allCases.filter { $0 != .largeFiles && $0 != .duplicateFiles }
     )
+
+    var phase: Phase = .idle
+    var selectedModuleIDs = standardModuleIDs
     var results: [ScanResult] = []
     var completedModules: [ModuleIdentifier] = []
     var totalDiscoveredSize: Int64 = 0
@@ -39,6 +41,19 @@ final class ScanViewModel {
 
     var availableModules: [any CleanerModule] {
         ModuleRegistry.availableModules()
+    }
+
+    /// 首页“开始扫描”的固定范围。大文件与重复文件均有独立入口，
+    /// 不能沿用上一次专项扫描留下的模块选择。
+    func startStandardScan() {
+        selectedModuleIDs = Self.standardModuleIDs
+        startScan()
+    }
+
+    /// 大文件专项扫描，只运行大文件模块。
+    func startLargeFileScan(minimumAllocatedSize: Int64) {
+        selectedModuleIDs = [.largeFiles]
+        startScan(largeFileMinimumAllocatedSize: minimumAllocatedSize)
     }
 
     func startScan(
@@ -182,6 +197,7 @@ final class ScanViewModel {
         scanTask?.cancel()
         stopPathPolling()
         clearLiveLargeFileResults()
+        selectedModuleIDs = Self.standardModuleIDs
         phase = .idle
     }
 
@@ -193,6 +209,7 @@ final class ScanViewModel {
         totalDiscoveredSize = 0
         currentScanPath = ""
         clearLiveLargeFileResults()
+        selectedModuleIDs = Self.standardModuleIDs
         phase = .idle
     }
 

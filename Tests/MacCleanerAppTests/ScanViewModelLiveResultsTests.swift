@@ -107,6 +107,30 @@ struct ScanViewModelLiveResultsTests {
         #expect(!viewModel.isLargeFileScan)
     }
 
+    @Test("取消大文件扫描后恢复普通扫描范围")
+    func cancelLargeFileScanRestoresStandardScope() {
+        let viewModel = ScanViewModel()
+        viewModel.selectedModuleIDs = [.largeFiles]
+
+        viewModel.cancel()
+
+        #expect(!viewModel.selectedModuleIDs.contains(.largeFiles))
+        #expect(!viewModel.selectedModuleIDs.contains(.duplicateFiles))
+        #expect(viewModel.selectedModuleIDs.contains(.developerCaches))
+    }
+
+    @Test("重置大文件结果后恢复普通扫描范围")
+    func resetLargeFileScanRestoresStandardScope() {
+        let viewModel = ScanViewModel()
+        viewModel.selectedModuleIDs = [.largeFiles]
+
+        viewModel.reset()
+
+        #expect(!viewModel.selectedModuleIDs.contains(.largeFiles))
+        #expect(!viewModel.selectedModuleIDs.contains(.duplicateFiles))
+        #expect(viewModel.selectedModuleIDs.contains(.developerCaches))
+    }
+
     @Test("大文件扫描阈值提供 200 MB 预设")
     func exposesTwoHundredMegabyteThreshold() {
         #expect(LargeFileThreshold.default == .megabytes100)

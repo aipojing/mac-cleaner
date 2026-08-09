@@ -303,6 +303,45 @@ final class AppUninstallerViewModel {
         selectedResidualPaths.contains(item.path)
     }
 
+    /// 可安全移入废纸篓的残留路径；无身份信息的项目永远不会进入全选范围。
+    private var selectableResidualPaths: Set<String> {
+        guard let residuals else { return [] }
+        return Set(
+            residuals.groups.flatMap(\.items)
+                .filter { $0.fileIdentity != nil }
+                .map(\.path)
+        )
+    }
+
+    var selectableResidualCount: Int {
+        selectableResidualPaths.count
+    }
+
+    var selectedSelectableResidualCount: Int {
+        selectedResidualPaths.intersection(selectableResidualPaths).count
+    }
+
+    var hasSelectableResiduals: Bool {
+        !selectableResidualPaths.isEmpty
+    }
+
+    var areAllSelectableResidualsSelected: Bool {
+        let selectablePaths = selectableResidualPaths
+        return !selectablePaths.isEmpty && selectablePaths.isSubset(of: selectedResidualPaths)
+    }
+
+    /// 在全选和取消全选间切换，且仅作用于可验证身份的残留项。
+    func toggleSelectAllResiduals() {
+        let selectablePaths = selectableResidualPaths
+        guard !selectablePaths.isEmpty else { return }
+
+        if selectablePaths.isSubset(of: selectedResidualPaths) {
+            selectedResidualPaths.subtract(selectablePaths)
+        } else {
+            selectedResidualPaths.formUnion(selectablePaths)
+        }
+    }
+
     /// 应用本体加上已扫描到的关联文件。未扫描过时只返回应用本体大小。
     func displaySize(for app: InstalledApp) -> Int64 {
         app.bundleSize + (residualTotalsByAppID[app.id] ?? 0)

@@ -64,4 +64,34 @@ struct AppUninstallerSelectionTests {
         #expect(viewModel.displaySize(for: app) == 130)
         #expect(viewModel.hasScannedResidualTotal(for: app))
     }
+
+    @Test("全选仅选择可验证的残留，并可再次取消全选")
+    func selectAllResidualsOnlySelectsSafeItems() async {
+        let identity = FileIdentity(device: 1, inode: 2, kind: .regularFile)
+        let service = StubAppUninstalling(
+            residuals: AppResidualFiles(groups: [
+                ResidualGroup(id: "mixed", label: "Mixed", items: [
+                    ResidualItem(path: "/tmp/safe-a", name: "safe-a", size: 10, fileIdentity: identity),
+                    ResidualItem(path: "/tmp/unverifiable", name: "unverifiable", size: 20, fileIdentity: nil),
+                    ResidualItem(path: "/tmp/safe-b", name: "safe-b", size: 30, fileIdentity: identity),
+                ]),
+            ])
+        )
+        let viewModel = AppUninstallerViewModel(service: service)
+        let app = InstalledApp(
+            name: "Demo", bundleID: "com.example.demo", version: "1.0",
+            path: "/Applications/Demo.app", bundleSize: 100, fileIdentity: nil
+        )
+
+        await viewModel.selectAppForTesting(app)
+
+        viewModel.toggleSelectAllResiduals()
+        #expect(viewModel.selectedResidualPaths == ["/tmp/safe-a", "/tmp/safe-b"])
+        #expect(viewModel.selectedResidualSize == 40)
+        #expect(viewModel.areAllSelectableResidualsSelected)
+
+        viewModel.toggleSelectAllResiduals()
+        #expect(viewModel.selectedResidualPaths.isEmpty)
+        #expect(!viewModel.areAllSelectableResidualsSelected)
+    }
 }

@@ -219,6 +219,25 @@ struct AppUninstallerView: View {
     private func residualsList(_ residuals: AppResidualFiles) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("残留文件 \(viewModel.selectedSelectableResidualCount)/\(viewModel.selectableResidualCount) 项已选")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button(viewModel.areAllSelectableResidualsSelected ? "取消全选" : "全选") {
+                        viewModel.toggleSelectAllResiduals()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!viewModel.hasSelectableResiduals)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+
+                Divider()
+
                 ForEach(residuals.groups) { group in
                     HStack {
                         Text(group.label)

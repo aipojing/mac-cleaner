@@ -52,7 +52,7 @@ struct ScanView: View {
             }
 
             Button {
-                viewModel.startScan()
+                viewModel.startStandardScan()
             } label: {
                 Text("开始扫描")
                     .font(.title3)
@@ -302,10 +302,7 @@ struct ScanView: View {
     }
 
     private func startLargeFileScan(with threshold: LargeFileThreshold) {
-        viewModel.selectedModuleIDs = [.largeFiles]
-        viewModel.startScan(
-            largeFileMinimumAllocatedSize: threshold.minimumAllocatedSize
-        )
+        viewModel.startLargeFileScan(minimumAllocatedSize: threshold.minimumAllocatedSize)
     }
 
     private var isScanning: Bool {
