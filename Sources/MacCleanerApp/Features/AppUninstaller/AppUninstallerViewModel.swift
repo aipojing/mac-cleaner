@@ -92,6 +92,7 @@ final class AppUninstallerViewModel {
     private var residualPrefetchTask: Task<Void, Never>?
     private var residualScanTasksByAppID: [UUID: Task<AppResidualFiles, Never>] = [:]
     private var residualPrefetchGeneration = UUID()
+    private let residualPrefetchConcurrency = 2
 
     init(service: any AppUninstalling = AppUninstallerService()) {
         self.service = service
@@ -134,8 +135,9 @@ final class AppUninstallerViewModel {
         }
     }
 
-    /// 仅在卸载器页面可见时按顺序补全各应用的关联文件总计。
-    /// 应用列表先完成展示，后台一次只处理一个应用，避免全盘并行遍历抢占磁盘。
+    /// 仅在卸载器页面可见时补全各应用的关联文件总计。
+    /// 最多两个应用同时扫描：单个超大应用不会堵住整条队列，而全局 FTS 闸门
+    /// 仍把实际目录遍历限制为两个，避免增加磁盘 IO 峰值。
     func stopBackgroundResidualPrefetch() {
         residualPrefetchGeneration = UUID()
         residualPrefetchTask?.cancel()
@@ -220,18 +222,58 @@ final class AppUninstallerViewModel {
         residualPrefetchGeneration = generation
         residualPrefetchCompleted = 0
         residualPrefetchTotal = apps.count
-
         residualPrefetchTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
-            for app in apps {
-                guard !Task.isCancelled, self.residualPrefetchGeneration == generation else { return }
-                _ = await self.cachedResiduals(for: app)
-                guard !Task.isCancelled, self.residualPrefetchGeneration == generation else { return }
-                self.residualPrefetchCompleted += 1
-            }
-            guard self.residualPrefetchGeneration == generation else { return }
-            self.residualPrefetchTask = nil
+            await self.runBackgroundResidualPrefetch(apps, generation: generation)
         }
+    }
+
+    private func runBackgroundResidualPrefetch(
+        _ apps: [InstalledApp], generation: UUID
+    ) async {
+        await withTaskGroup(of: Void.self) { group in
+            var pendingApps = ArraySlice(apps)
+
+            func scheduleNextApp() {
+                guard let app = pendingApps.popFirst() else { return }
+                group.addTask { [weak self] in
+                    guard let self else { return }
+                    await self.prefetchResidualTotal(for: app, generation: generation)
+                }
+            }
+
+            for _ in 0..<min(residualPrefetchConcurrency, pendingApps.count) {
+                scheduleNextApp()
+            }
+
+            while await group.next() != nil {
+                guard !Task.isCancelled,
+                      residualPrefetchGeneration == generation
+                else {
+                    group.cancelAll()
+                    break
+                }
+                scheduleNextApp()
+            }
+        }
+
+        guard !Task.isCancelled,
+              residualPrefetchGeneration == generation
+        else { return }
+        residualPrefetchTask = nil
+    }
+
+    private func prefetchResidualTotal(for app: InstalledApp, generation: UUID) async {
+        guard !Task.isCancelled,
+              residualPrefetchGeneration == generation
+        else { return }
+
+        _ = await cachedResiduals(for: app)
+
+        guard !Task.isCancelled,
+              residualPrefetchGeneration == generation
+        else { return }
+        residualPrefetchCompleted += 1
     }
 
     func selectAppFromURL(_ url: URL) {

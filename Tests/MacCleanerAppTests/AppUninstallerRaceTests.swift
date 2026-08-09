@@ -122,6 +122,47 @@ private actor PrefetchingAppUninstalling: AppUninstalling {
     }
 }
 
+/// 首个应用的关联文件扫描长时间运行时，验证它不能阻塞后续应用的总计补全。
+private actor SlowFirstPrefetchingAppUninstalling: AppUninstalling {
+    let apps: [InstalledApp]
+    private let slowBundleID: String
+    private var slowGate: CheckedContinuation<Void, Never>?
+
+    init(apps: [InstalledApp], slowBundleID: String) {
+        self.apps = apps
+        self.slowBundleID = slowBundleID
+    }
+
+    func scanApplications() async -> [InstalledApp] { apps }
+
+    func findResiduals(for app: InstalledApp) async -> AppResidualFiles {
+        if app.bundleID == slowBundleID {
+            await withCheckedContinuation { continuation in
+                slowGate = continuation
+            }
+        }
+        return makeResiduals(label: app.bundleID)
+    }
+
+    func uninstall(app: InstalledApp, residualItems: [ResidualItem]) async -> UninstallReport {
+        UninstallReport(
+            appName: app.name, appRemoved: false,
+            residualsRemoved: 0, failures: 0, bytesMovedToTrash: 0
+        )
+    }
+
+    func waitForSlowScan() async {
+        while slowGate == nil {
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+    }
+
+    func releaseSlowScan() {
+        slowGate?.resume()
+        slowGate = nil
+    }
+}
+
 @MainActor
 @Suite("App uninstaller residual scan race")
 struct AppUninstallerRaceTests {
@@ -200,7 +241,7 @@ struct AppUninstallerRaceTests {
 
     @Test("后台补全总计后打开同一应用复用结果")
     func prefetchesResidualTotalsAndReusesCachedDetails() async {
-        let app = makeApp("com.example.prefetch")
+        let app = makeApp("com.example.prefetch.\(UUID().uuidString)")
         let service = PrefetchingAppUninstalling(
             apps: [app],
             residualsByBundleID: [app.bundleID: makeResiduals(label: "prefetched")]
@@ -220,6 +261,31 @@ struct AppUninstallerRaceTests {
 
         #expect(viewModel.residuals?.groups.first?.label == "prefetched")
         #expect(await service.residualScanCallCount == 1, "打开已预扫的应用不得重复遍历磁盘")
+    }
+
+    @Test("单个大应用补全缓慢时，后续应用仍会继续显示总计")
+    func slowPrefetchDoesNotBlockLaterApps() async {
+        let slowApp = makeApp("com.example.slow.\(UUID().uuidString)")
+        let fastApp = makeApp("com.example.fast.\(UUID().uuidString)")
+        let service = SlowFirstPrefetchingAppUninstalling(
+            apps: [slowApp, fastApp],
+            slowBundleID: slowApp.bundleID
+        )
+        let viewModel = AppUninstallerViewModel(service: service)
+
+        viewModel.loadApps()
+        await service.waitForSlowScan()
+
+        for _ in 0..<100 where !viewModel.hasScannedResidualTotal(for: fastApp) {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        #expect(
+            viewModel.hasScannedResidualTotal(for: fastApp),
+            "慢应用扫描在途时，后续应用不应始终卡在 0/N"
+        )
+
+        await service.releaseSlowScan()
     }
 
     @Test("重开卸载器会复用当天的关联文件总计")
