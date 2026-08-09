@@ -136,6 +136,7 @@ final class AISettingsViewModel {
     /// 模型页的主保存操作：先校验并保存模型配置；若用户输入了新 Key，
     /// 再按既有的隐私同意流程保存 Key。已配置但未输入新 Key 时不会覆盖旧 Key。
     func saveModelConfiguration() async {
+        baseURLInput = DeepSeekConfiguration.defaultBaseURL.absoluteString
         saveServiceConfiguration()
         guard serviceConfigurationErrorMessage == nil,
               !apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

@@ -182,21 +182,6 @@ struct AISettingsView: View {
                 }
             }
 
-            configurationField("接口地址") {
-                TextField("https://api.deepseek.com", text: $viewModel.baseURLInput)
-                    .textFieldStyle(.roundedBorder)
-                HStack {
-                    Text("默认地址为 https://api.deepseek.com；使用兼容网关时可改为对应的 HTTPS 地址。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Link("查看文档", destination: URL(string: "https://api-docs.deepseek.com/")!)
-                        .font(.caption)
-                }
-            }
-
-            advancedConfiguration
-
             if let message = viewModel.serviceConfigurationErrorMessage {
                 Text(message)
                     .font(.caption)
@@ -226,32 +211,6 @@ struct AISettingsView: View {
         }
         .padding(24)
         .background(.quinary, in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private var advancedConfiguration: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("高级配置")
-                .font(.headline)
-
-            HStack(spacing: 24) {
-                Label("结构化工具调用", systemImage: "checkmark.square.fill")
-                    .foregroundStyle(.primary)
-                Label("思考模式已关闭", systemImage: "minus.square")
-                    .foregroundStyle(.secondary)
-            }
-            .font(.subheadline)
-
-            Text("为保证清理建议可以校验，工具调用始终开启；当前模型调用会自动关闭思考模式。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.quaternary, lineWidth: 1)
-        }
     }
 
     private var cacheCard: some View {
