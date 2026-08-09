@@ -243,6 +243,9 @@ struct AISettingsView: View {
         VStack(alignment: .leading, spacing: 14) {
             Label("数据与隐私", systemImage: "hand.raised")
                 .font(.headline)
+            Text(Self.privacyText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
