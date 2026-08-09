@@ -42,4 +42,26 @@ struct AppUninstallerSelectionTests {
         #expect(viewModel.residuals?.totalItemCount == 2)
         #expect(viewModel.selectedResidualPaths.isEmpty, "残留必须默认不选中，等待用户显式勾选")
     }
+
+    @Test("已发现残留后，应用列表总计包含应用本体和残留")
+    func appListTotalIncludesBundleAndResiduals() async {
+        let identity = FileIdentity(device: 1, inode: 2, kind: .regularFile)
+        let service = StubAppUninstalling(
+            residuals: AppResidualFiles(groups: [
+                ResidualGroup(id: "cache", label: "Caches", items: [
+                    ResidualItem(path: "/tmp/cache", name: "cache", size: 30, fileIdentity: identity),
+                ]),
+            ])
+        )
+        let viewModel = AppUninstallerViewModel(service: service)
+        let app = InstalledApp(
+            name: "Demo", bundleID: "com.example.demo", version: "1.0",
+            path: "/Applications/Demo.app", bundleSize: 100, fileIdentity: nil
+        )
+
+        await viewModel.selectAppForTesting(app)
+
+        #expect(viewModel.displaySize(for: app) == 130)
+        #expect(viewModel.hasScannedResidualTotal(for: app))
+    }
 }

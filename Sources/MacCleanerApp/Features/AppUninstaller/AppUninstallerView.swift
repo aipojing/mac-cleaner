@@ -116,7 +116,7 @@ struct AppUninstallerView: View {
                     Text(app.name)
                         .fontWeight(.medium)
                         .lineLimit(1)
-                    Text(SizeFormatter.format(bytes: app.bundleSize))
+                    Text(appListSizeText(for: app))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -196,7 +196,7 @@ struct AppUninstallerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(app.name).font(.title3).fontWeight(.semibold)
                 Text(app.bundleID).font(.caption).foregroundStyle(.secondary)
-                Text("版本 \(app.version)  应用大小 \(SizeFormatter.format(bytes: app.bundleSize))")
+                Text(appDetailSizeText(for: app))
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -209,13 +209,17 @@ struct AppUninstallerView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(residuals.groups) { group in
-                    Text(group.label)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 4)
+                    HStack {
+                        Text(group.label)
+                        Spacer()
+                        Text("\(group.items.count) 项 · \(SizeFormatter.format(bytes: group.totalSize))")
+                    }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
 
                     ForEach(group.items) { item in
                         residualRow(item)
@@ -293,5 +297,19 @@ struct AppUninstallerView: View {
         let home = DiskScanner.homeDirectory
         if path.hasPrefix(home) { return "~" + path.dropFirst(home.count) }
         return path
+    }
+
+    private func appListSizeText(for app: InstalledApp) -> String {
+        if viewModel.hasScannedResidualTotal(for: app) {
+            return "总计 \(SizeFormatter.format(bytes: viewModel.displaySize(for: app)))"
+        }
+        return "应用 \(SizeFormatter.format(bytes: app.bundleSize))"
+    }
+
+    private func appDetailSizeText(for app: InstalledApp) -> String {
+        guard viewModel.hasScannedResidualTotal(for: app), let residuals = viewModel.residuals else {
+            return "版本 \(app.version)  应用大小 \(SizeFormatter.format(bytes: app.bundleSize))"
+        }
+        return "版本 \(app.version)  应用 \(SizeFormatter.format(bytes: app.bundleSize)) · 残留 \(SizeFormatter.format(bytes: residuals.totalSize)) · 总计 \(SizeFormatter.format(bytes: viewModel.displaySize(for: app)))"
     }
 }

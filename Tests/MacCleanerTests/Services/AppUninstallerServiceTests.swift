@@ -12,8 +12,8 @@ struct AppUninstallerServiceTests {
         return path
     }
 
-    @Test("发现厂商目录下匹配产品的支持文件和缓存，不带入同厂商其他产品")
-    func findsNestedVendorProductResiduals() async throws {
+    @Test("将厂商目录下匹配产品的支持文件和缓存拆为可单独选择的子项")
+    func expandsNestedVendorProductResiduals() async throws {
         let uniqueSuffix = UUID().uuidString
         let vendor = "UninstallerTestVendor\(uniqueSuffix)"
         let product = "Browser"
@@ -44,8 +44,10 @@ struct AppUninstallerServiceTests {
         let residuals = await AppUninstallerService(homeDirectory: home).findResiduals(for: app)
         let paths = Set(residuals.groups.flatMap(\.items).map(\.path))
 
-        #expect(paths.contains(applicationSupportProduct))
-        #expect(paths.contains(cacheProduct))
+        #expect(paths.contains("\(applicationSupportProduct)/fixture"))
+        #expect(paths.contains("\(cacheProduct)/fixture"))
+        #expect(!paths.contains(applicationSupportProduct), "产品目录应展开为直接子项，便于逐项审查")
+        #expect(!paths.contains(cacheProduct), "产品目录应展开为直接子项，便于逐项审查")
         #expect(!paths.contains(unrelatedProduct))
     }
 

@@ -214,24 +214,58 @@ public actor AppUninstallerService {
     }
 
     private nonisolated func probeLocation(paths: [String]) -> [ResidualItem] {
-        let fm = FileManager.default
-        var items: [ResidualItem] = []
+        paths
+            .flatMap(residualItems(at:))
+            .sorted {
+                if $0.size != $1.size { return $0.size > $1.size }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+    }
 
-        for path in paths {
-            guard fm.fileExists(atPath: path) else { continue }
-            let name = (path as NSString).lastPathComponent
-            var isDir: ObjCBool = false
-            fm.fileExists(atPath: path, isDirectory: &isDir)
-            let size: Int64 = isDir.boolValue ? scanner.directorySize(at: path) : {
-                let attrs = try? fm.attributesOfItem(atPath: path)
-                return attrs?[.size] as? Int64 ?? 0
-            }()
-            // 记录扫描身份；失败时保持 nil，卸载执行会被 guard 拒绝。
-            let identity = try? identityProvider.identity(at: path)
-            items.append(ResidualItem(path: path, name: name, size: size, fileIdentity: identity))
+    /// 目录残留展示为第一层真实内容，而不是一个不可审查的大目录。
+    ///
+    /// 例如 `Application Support/Google/Chrome` 会列出它的 Profile、配置和
+    /// 缓存分区；每个目录的大小仍递归统计。只展开一层，避免把浏览器数十万
+    /// 个内部文件全部塞进界面，也让每项都能独立勾选并移入废纸篓。
+    private nonisolated func residualItems(at path: String) -> [ResidualItem] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return [] }
+
+        let identity = try? identityProvider.identity(at: path)
+        guard identity?.kind == .directory,
+              let names = try? fm.contentsOfDirectory(atPath: path),
+              !names.isEmpty
+        else {
+            return makeResidualItem(at: path, identity: identity).map { [$0] } ?? []
         }
 
-        return items
+        let children = names.map { (path as NSString).appendingPathComponent($0) }
+        return children.compactMap { makeResidualItem(at: $0) }
+    }
+
+    private nonisolated func makeResidualItem(
+        at path: String,
+        identity suppliedIdentity: FileIdentity? = nil
+    ) -> ResidualItem? {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return nil }
+
+        // 记录扫描身份；失败时保持 nil，卸载执行会被 guard 拒绝。
+        let identity = suppliedIdentity ?? (try? identityProvider.identity(at: path))
+        let size: Int64
+        if identity?.kind == .directory {
+            size = scanner.directorySize(at: path)
+        } else {
+            let attrs = try? fm.attributesOfItem(atPath: path)
+            size = attrs?[.size] as? Int64 ?? 0
+        }
+
+        return ResidualItem(
+            path: path,
+            name: (path as NSString).lastPathComponent,
+            size: size,
+            fileIdentity: identity
+        )
     }
 
     /// 有些应用把数据置于厂商/产品两层目录，例如
