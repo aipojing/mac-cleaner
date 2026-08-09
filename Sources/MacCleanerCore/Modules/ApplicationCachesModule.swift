@@ -59,7 +59,9 @@ public struct ApplicationCachesModule: CleanerModule {
     }
 
     public func clean(items: [CleanableItem], dryRun: Bool) async throws -> CleanupReport {
-        Deleter().delete(items: items, module: .applicationCaches, dryRun: dryRun, useTrash: false)
+        // 应用缓存可能含用户数据（如第三方通讯应用的缓存），
+        // 一律走废纸篓保证可恢复，不做永久删除。
+        Deleter().delete(items: items, module: .applicationCaches, dryRun: dryRun, useTrash: true)
     }
 
     // MARK: - 已知应用映射

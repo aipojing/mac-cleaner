@@ -43,11 +43,35 @@ public struct DeletionGuard: Sendable {
         self.protectedSubtrees = protectedSubtrees.map { identityProvider.resolvedPath($0) }
     }
 
+    /// 通过验证的删除目标：当前身份 + 验证过的规范化路径。
+    public struct ValidatedTarget: Equatable, Sendable {
+        /// 删除时重新读取的当前身份（与扫描快照一致）。
+        public let identity: FileIdentity
+        /// 验证过的规范化路径：父目录的符号链接已解析，
+        /// 最终组件保持原样（不跟随符号链接）。
+        /// 调用方必须用它执行删除，而不是原始输入路径。
+        public let canonicalPath: String
+    }
+
     /// 验证删除目标。成功时返回当前身份；失败抛出 DeletionGuardError。
     public func validate(
         path: String,
         expectedIdentity: FileIdentity?
     ) throws -> FileIdentity {
+        try validatedTarget(path: path, expectedIdentity: expectedIdentity).identity
+    }
+
+    /// 验证删除目标，成功时返回身份与验证过的规范化路径。
+    ///
+    /// 执行删除必须使用返回的 canonicalPath：校验与删除若各自对
+    /// 原始路径做一次解析，窗口内可经 rename + symlink 交换把删除
+    /// 重定向到别处；复用同一次解析结果能缩小该 TOCTOU 窗口。
+    /// 注意这只能缩小而非消除——lstat 与 removeItem 之间目标仍可能
+    /// 被替换；彻底消除需要基于目录 fd 的 openat/unlinkat 方案（未实现）。
+    public func validatedTarget(
+        path: String,
+        expectedIdentity: FileIdentity?
+    ) throws -> ValidatedTarget {
         guard identityProvider.exists(at: path) else {
             throw DeletionGuardError.targetMissing
         }
@@ -86,7 +110,7 @@ public struct DeletionGuard: Sendable {
         guard current == expectedIdentity else {
             throw DeletionGuardError.identityChanged
         }
-        return current
+        return ValidatedTarget(identity: current, canonicalPath: canonicalPath)
     }
 
     /// 路径组件边界的包含判断：

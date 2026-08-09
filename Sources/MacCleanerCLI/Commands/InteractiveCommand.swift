@@ -48,9 +48,14 @@ public struct InteractiveCommand {
         print("\n\(ANSIStyle.bold)🔍 扫描中...\(ANSIStyle.reset)\n")
 
         let coordinator = ScanCoordinator(modules: selectedModules)
-        let allResults = try await coordinator.scan()
-        for result in allResults {
-            print("  扫描 \(result.module.displayName)... \(ANSIStyle.green)✔\(ANSIStyle.reset) \(result.items.count) 项, \(ANSIStyle.coloredSize(result.totalSize))")
+        let scanned = try await coordinator.scan()
+        // 与 CleanCommand 一致：先应用排除过滤再展示
+        let filter = ScanResultFilter(exclusionManager: ExclusionManager.shared)
+        var allResults: [ScanResult] = []
+        for result in scanned {
+            let filtered = await filter.apply(to: result)
+            allResults.append(filtered)
+            print("  扫描 \(filtered.module.displayName)... \(ANSIStyle.green)✔\(ANSIStyle.reset) \(filtered.items.count) 项, \(ANSIStyle.coloredSize(filtered.totalSize))")
         }
 
         // Step 4: Show results summary
@@ -126,12 +131,15 @@ public struct InteractiveCommand {
         // Non-interactive: just scan and print results
         print("非交互式模式 — 请使用 'mac-cleaner scan' 或 'mac-cleaner clean' 命令\n")
 
+        let filter = ScanResultFilter(exclusionManager: ExclusionManager.shared)
         for module in modules {
             let result = try await module.scan(context: ScanContext())
-            print("  \(module.displayName): \(result.items.count) 项, \(result.totalSize.formattedSize)")
+            let filtered = await filter.apply(to: result)
+            print("  \(module.displayName): \(filtered.items.count) 项, \(filtered.totalSize.formattedSize)")
         }
 
-        print("\n使用 'mac-cleaner clean --all --yes' 清理所有候选")
+        print("\n建议显式指定模块并先预览，例如 'mac-cleaner clean --dev-caches --dry-run'；")
+        print("确认候选无误后去掉 --dry-run 再执行实际清理")
     }
 
     private func printBanner() {

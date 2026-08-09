@@ -30,7 +30,7 @@ public struct LargeFileScannerModule: CleanerModule {
 
         // 顺序型模块：整个枚举过程占用一个文件任务许可。
         return try await context.fileTaskLimiter.withPermit {
-            let files = try collectLargeFiles(onUpdate: context.onLargeFileUpdate)
+            let files = try await collectLargeFiles(onUpdate: context.onLargeFileUpdate)
             let items = files.map { makeItem(from: $0) }
 
             return ScanResult(
@@ -68,15 +68,18 @@ public struct LargeFileScannerModule: CleanerModule {
     /// 常驻候选不超过 limit，不再全量收集后排序。
     /// 评分与阈值都使用实际占用（st_blocks * 512）。
     /// onUpdate 非 nil 时边枚举边发布限频的实时快照，并以最终快照收尾。
+    /// fts 许可等待挂起（可取消）；枚举循环内逐条检查取消。
     private func collectLargeFiles(
         onUpdate: (@Sendable (LargeFileScanUpdate) -> Void)?
-    ) throws -> [FileMetadata] {
-        try FTSTraversalGate.withPermit {
+    ) async throws -> [FileMetadata] {
+        try await FTSTraversalGate.withPermit {
             let cPath = scanRoot.withCString { strdup($0) }
             guard let cPath else { return [] }
             defer { free(cPath) }
 
-            let skipDirs: Set<String> = ["Library", ".Trash", ".gradle", ".m2", ".npm", ".cocoapods", ".pub-cache"]
+            // 与重复文件模块共用排除集合：.git/objects/pack 下的 pack 文件
+            // repack 后常超 100MB，删除即损坏仓库；node_modules/Pods 同理。
+            let skipDirs: Set<String> = ScanTraversalExclusions.common.union(["Library", ".Trash"])
 
             var paths: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
             guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil) else {

@@ -21,6 +21,8 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.language.rawValue)
 
+            // VM 由 AppEnvironment 惰性持有，body 重算不会重建，
+            // 正在输入的 API Key、连接状态、隐私弹窗状态得以保留。
             AISettingsView(viewModel: environment.aiSettingsViewModel)
             .tabItem {
                 Label("AI", systemImage: "sparkles")

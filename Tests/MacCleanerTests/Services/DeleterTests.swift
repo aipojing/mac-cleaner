@@ -1,8 +1,10 @@
 import Testing
 import Foundation
+import Darwin
 @testable import MacCleanerCore
 
 /// 测试专用策略目录：只允许测试临时目录。
+/// 漂移强制开关与生产目录一致：只对 large-files 开启。
 struct TestDeletionPolicyCatalog: DeletionPolicyProviding {
     let allowedRoots: [String]
 
@@ -10,7 +12,8 @@ struct TestDeletionPolicyCatalog: DeletionPolicyProviding {
         DeletionPolicy(
             allowedRoots: allowedRoots,
             protectedExactPaths: ["/"],
-            protectedSubtrees: ["/System", "/usr/bin", "/usr/lib", "/bin", "/sbin"]
+            protectedSubtrees: ["/System", "/usr/bin", "/usr/lib", "/bin", "/sbin"],
+            rejectOnContentDrift: module == .largeFiles
         )
     }
 }
@@ -322,7 +325,8 @@ struct FailedItemClassificationTests {
     func localizedDescriptions() {
         for reason in [
             FailureReason.permissionDenied, .fileInUse, .notFound, .diskFull,
-            .unsafeTarget, .identityChanged, .identityUnavailable, .unknown,
+            .unsafeTarget, .identityChanged, .identityUnavailable,
+            .contentModified, .unknown,
         ] {
             #expect(!reason.localizedDescription.isEmpty)
         }
@@ -421,5 +425,109 @@ extension DeleterTests {
         #expect(report.successCount == 0)
         #expect(report.failedItems.first?.reason == .identityChanged)
         #expect(FileManager.default.fileExists(atPath: filePath), "身份变化时不得删除目标")
+    }
+
+    @Test("item.path 经符号链接父目录时，删除落在规范化路径上")
+    func deletesViaCanonicalPath() throws {
+        let dir = createTempDir()
+        defer { cleanupPath(dir) }
+        let realDir = (dir as NSString).appendingPathComponent("real")
+        try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
+        let filePath = createTempFile(in: realDir, name: "cache.bin")
+        let alias = (dir as NSString).appendingPathComponent("alias")
+        try FileManager.default.createSymbolicLink(atPath: alias, withDestinationPath: realDir)
+
+        // item.path 含符号链接父目录组件；身份按同一文件对象记录
+        let aliasedPath = (alias as NSString).appendingPathComponent("cache.bin")
+        let item = makeItem(path: aliasedPath, size: 1024)
+        let report = makeDeleter(allowedRoots: [realDir]).delete(
+            items: [item], module: .developerCaches,
+            dryRun: false, useTrash: false
+        )
+
+        #expect(report.successCount == 1)
+        #expect(report.failedItems.isEmpty)
+        // 真实文件已被删除（删除落在规范化路径上）
+        #expect(!FileManager.default.fileExists(atPath: filePath))
+        // 符号链接父目录本身必须保留，未被误删
+        var st = stat()
+        #expect(lstat(alias, &st) == 0, "符号链接父目录不得被删除")
+        #expect((st.st_mode & S_IFMT) == S_IFLNK)
+    }
+
+    @Test("large-files：扫描后内容漂移的目标被拒绝删除")
+    func largeFileContentDriftRejected() throws {
+        let dir = createTempDir()
+        defer { cleanupPath(dir) }
+        let path = createTempFile(in: dir, name: "big.bin", size: 1024)
+
+        // 模拟扫描：记录身份与内容指纹（mtime + size）
+        let item = CleanableItem(
+            path: path, displayName: "Big", size: 1024, category: .largeFiles
+        ).recordingIdentity(via: identityProvider)
+        #expect(item.recordedModificationNanoseconds != nil)
+        #expect(item.recordedContentSize == 1024)
+
+        // 扫描后原地修改内容：inode 不变，但 size/mtime 已漂移
+        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        try handle.seekToEnd()
+        handle.write(Data(count: 512))
+        try handle.close()
+
+        let report = makeDeleter(allowedRoots: [dir]).delete(
+            items: [item], module: .largeFiles,
+            dryRun: false, useTrash: false
+        )
+
+        #expect(report.successCount == 0)
+        #expect(report.failureCount == 1)
+        #expect(report.failedItems.first?.reason == .contentModified)
+        #expect(FileManager.default.fileExists(atPath: path), "内容漂移时不得删除目标")
+    }
+
+    @Test("large-files：内容未漂移时正常删除")
+    func largeFileWithoutDriftDeleted() throws {
+        let dir = createTempDir()
+        defer { cleanupPath(dir) }
+        let path = createTempFile(in: dir, name: "big.bin", size: 2048)
+
+        let item = CleanableItem(
+            path: path, displayName: "Big", size: 2048, category: .largeFiles
+        ).recordingIdentity(via: identityProvider)
+
+        let report = makeDeleter(allowedRoots: [dir]).delete(
+            items: [item], module: .largeFiles,
+            dryRun: false, useTrash: false
+        )
+
+        #expect(report.successCount == 1)
+        #expect(report.failedItems.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: path))
+    }
+
+    @Test("非 large-files 模块：内容合法变化不触发漂移拒删")
+    func otherModulesIgnoreContentDrift() throws {
+        let dir = createTempDir()
+        defer { cleanupPath(dir) }
+        let path = createTempFile(in: dir, name: "cache.bin", size: 1024)
+
+        // 缓存类条目同样记录了指纹，但策略未开启强制漂移检测
+        let item = CleanableItem(
+            path: path, displayName: "Cache", size: 1024, category: .developerCaches
+        ).recordingIdentity(via: identityProvider)
+
+        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        try handle.seekToEnd()
+        handle.write(Data(count: 512))
+        try handle.close()
+
+        let report = makeDeleter(allowedRoots: [dir]).delete(
+            items: [item], module: .developerCaches,
+            dryRun: false, useTrash: false
+        )
+
+        #expect(report.successCount == 1)
+        #expect(report.failedItems.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: path))
     }
 }

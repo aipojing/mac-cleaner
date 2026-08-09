@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import Testing
 @testable import MacCleanerCore
 
@@ -52,6 +53,34 @@ struct AIFingerprintGeneratorTests {
         let second = try generator.processFingerprint(.fixture())
         #expect(first == second)
     }
+
+    @Test("进程判断语义升级后不复用旧建议缓存")
+    func processTerminationIntentInvalidatesLegacyFingerprint() throws {
+        let generator = AIFingerprintGenerator()
+        let input = ProcessFingerprintInput.fixture()
+        let current = try generator.processFingerprint(input)
+        let legacy = try generator.digest(
+            LegacyProcessPayload(
+                schemaVersion: 1,
+                pid: input.pid,
+                executablePath: input.executablePath,
+                bundleIdentifier: input.bundleIdentifier,
+                startTimeTicks: input.startTimeTicks,
+                signedByApple: input.signedByApple
+            )
+        )
+
+        #expect(current != legacy)
+    }
+}
+
+private struct LegacyProcessPayload: Encodable {
+    let schemaVersion: Int
+    let pid: Int32
+    let executablePath: String
+    let bundleIdentifier: String?
+    let startTimeTicks: UInt64
+    let signedByApple: Bool?
 }
 
 private extension CleanupFingerprintInput {

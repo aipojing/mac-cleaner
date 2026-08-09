@@ -19,7 +19,21 @@ public struct ScanCommand: AsyncParsableCommand {
     public mutating func run() async throws {
         let selectedModules: [any CleanerModule]
         if let moduleList = modules {
-            let ids = moduleList.split(separator: ",").compactMap { ModuleIdentifier(rawValue: String($0)) }
+            let names = moduleList.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }
+            var ids: [ModuleIdentifier] = []
+            var unknown: [String] = []
+            for name in names {
+                if let id = ModuleIdentifier(rawValue: name) {
+                    ids.append(id)
+                } else {
+                    unknown.append(name)
+                }
+            }
+            guard unknown.isEmpty else {
+                throw ValidationError(
+                    "未识别的模块: \(unknown.joined(separator: ", "))。可用模块: \(ModuleIdentifier.allCases.map(\.rawValue).joined(separator: ", "))"
+                )
+            }
             selectedModules = ModuleRegistry.modules(for: ids).filter { $0.isAvailable() }
         } else {
             selectedModules = ModuleRegistry.availableModules()

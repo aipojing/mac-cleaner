@@ -166,22 +166,38 @@ struct ModuleSemanticTests {
         }
     }
 
+    /// 支持注入扫描根/主目录的模块，用 TemporaryHome fixture 验证，
+    /// 不再扫描真实用户主目录。DeveloperCaches/Xcode/AIToolCaches/
+    /// ApplicationCaches/AndroidSDK 目前不支持注入 home，不在此列。
+    private func fixtureBackedModules(home: TemporaryHome) -> [any CleanerModule] {
+        [
+            SystemLogsModule(homeDirectory: home.url),
+            DockerModule(homeDirectory: home.url),
+            LargeFileScannerModule(scanRoot: home.path, minAllocatedSize: 1),
+            DuplicateFilesModule(scanRoot: home.path, minSize: 1),
+        ]
+    }
+
+    private func makeSemanticFixture() throws -> TemporaryHome {
+        try TemporaryHome.fixture(files: [
+            "Library/Logs/MyApp/big.log": String(repeating: "x", count: 1_300_000),
+            "Library/Containers/com.docker.docker/Data/log/vm/docker.log": "docker-log-content",
+            ".docker/buildx/cache.db": "buildx-cache-content-for-size",
+            "Downloads/big.bin": String(repeating: "y", count: 64 * 1024),
+            "Documents/copy1.txt": "duplicate-content",
+            "Desktop/copy2.txt": "duplicate-content",
+        ])
+    }
+
     @Test("所有存在的文件候选都记录了扫描身份")
     func scannedFileCandidatesCarryIdentity() async throws {
-        let fileBasedModules: [any CleanerModule] = [
-            DeveloperCachesModule(),
-            XcodeModule(),
-            AIToolCachesModule(),
-            ApplicationCachesModule(),
-            SystemLogsModule(),
-            DockerModule(),
-            LargeFileScannerModule(),
-            AndroidSDKModule(),
-        ]
+        let home = try makeSemanticFixture()
+        defer { home.remove() }
 
-        for module in fileBasedModules {
+        for module in fixtureBackedModules(home: home) {
             guard module.isAvailable() else { continue }
             let result = try await module.scan(context: ScanContext())
+            #expect(!result.items.isEmpty, "\(module.displayName): fixture 应产生候选")
             for item in result.items {
                 var isDir: ObjCBool = false
                 let exists = FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir)
@@ -197,15 +213,10 @@ struct ModuleSemanticTests {
 
     @Test("DryRun clean never deletes files across all modules")
     func dryRunNeverDeletes() async throws {
-        let modules: [any CleanerModule] = [
-            DeveloperCachesModule(),
-            XcodeModule(),
-            AIToolCachesModule(),
-            ApplicationCachesModule(),
-            LargeFileScannerModule(),
-        ]
+        let home = try makeSemanticFixture()
+        defer { home.remove() }
 
-        for module in modules {
+        for module in fixtureBackedModules(home: home) {
             guard module.isAvailable() else { continue }
             let result = try await module.scan(context: ScanContext())
             guard !result.items.isEmpty else { continue }

@@ -11,14 +11,18 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
     private let skipDirectories: Set<String>
     private let identityProvider: any FileIdentityProviding
     private let hashCache: FileHashCache?
+    private let deleter: Deleter
+    /// 最近一次扫描的组记录，供 clean 做执行层不变量与漂移校验。
+    private let scanRegistry = DuplicateScanRegistry()
 
-    /// 默认跳过的目录
-    public static let defaultSkipDirectories: Set<String> = [
-        "Library", ".Trash", ".git", "node_modules",
-        ".gradle", ".m2", ".npm", ".cocoapods", ".pub-cache",
-        ".cargo", "Pods", ".build", "DerivedData",
-        "venv", ".venv", "__pycache__", ".tox",
-    ]
+    /// 默认跳过的目录：与所有递归扫描共用 ScanTraversalExclusions，
+    /// 另加构建产物与虚拟环境目录。
+    public static let defaultSkipDirectories: Set<String> =
+        ScanTraversalExclusions.common.union([
+            "Library", ".Trash",
+            ".build", "DerivedData",
+            "venv", ".venv", "__pycache__", ".tox",
+        ])
 
     public init(
         scanRoot: String = DiskScanner.homeDirectory,
@@ -26,7 +30,8 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         hasher: FileHasher = FileHasher(),
         skipDirectories: Set<String>? = nil,
         identityProvider: any FileIdentityProviding = POSIXFileIdentityProvider(),
-        hashCache: FileHashCache? = nil
+        hashCache: FileHashCache? = nil,
+        deleter: Deleter = Deleter()
     ) {
         self.scanRoot = scanRoot
         self.minSize = minSize
@@ -34,6 +39,7 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         self.skipDirectories = skipDirectories ?? Self.defaultSkipDirectories
         self.identityProvider = identityProvider
         self.hashCache = hashCache
+        self.deleter = deleter
     }
 
     public func isAvailable() -> Bool { true }
@@ -45,10 +51,11 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         var paths: [String]
     }
 
-    /// full hash 确认的重复组：id 为 full SHA-256。
+    /// full hash 确认的重复组：id 为 full SHA-256；每个对象携带扫描时的
+    /// sampled hash，供 clean 前的内容漂移重验比对。
     struct ConfirmedGroup: Sendable {
         let id: String
-        let objects: [PhysicalObject]
+        let objects: [(object: PhysicalObject, sampledHash: String)]
     }
 
     public func scan(context: ScanContext) async throws -> ScanResult {
@@ -57,7 +64,7 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         // Phase 1: fts 枚举，按逻辑大小分桶（内容相同必然大小相同）。
         // 占用一个文件任务许可，枚举与元数据来自同一次 lstat。
         let sizeGroups = try await context.fileTaskLimiter.withPermit {
-            self.groupFilesBySize()
+            try await self.groupFilesBySize()
         }
 
         // Phase 2: 同大小桶内按 (device,inode) 合并物理对象；
@@ -77,9 +84,9 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         // 硬链接的每条路径独立成为候选（不隐式合并删除）。
         var items: [CleanableItem] = []
         for group in confirmedGroups {
-            for object in group.objects {
-                let metadata = object.metadata
-                for path in object.paths {
+            for entry in group.objects {
+                let metadata = entry.object.metadata
+                for path in entry.object.paths {
                     items.append(CleanableItem(
                         path: path,
                         displayName: (path as NSString).lastPathComponent,
@@ -95,6 +102,24 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
             }
         }
 
+        // 记录执行层校验所需的组成员与抽样指纹
+        // （clean 的“每组至少保留一份”不变量与删除前漂移重验）。
+        var memberMap: [String: Set<String>] = [:]
+        var recordMap: [String: DuplicateScanRegistry.FileRecord] = [:]
+        for group in confirmedGroups {
+            for entry in group.objects {
+                for path in entry.object.paths {
+                    memberMap[group.id, default: []].insert(path)
+                    recordMap[path] = DuplicateScanRegistry.FileRecord(
+                        groupHash: group.id,
+                        logicalSize: entry.object.metadata.logicalSize,
+                        sampledHash: entry.sampledHash
+                    )
+                }
+            }
+        }
+        await scanRegistry.replace(groupMembers: memberMap, fileRecords: recordMap)
+
         return ScanResult(
             module: .duplicateFiles,
             items: items,
@@ -102,8 +127,69 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         )
     }
 
+    /// 执行层防护（不依赖 UI 层的 keptFiles 选择）：
+    /// 1. 组保留不变量：按 subcategory（组 hash）分组，某组的所有已知路径
+    ///    都在删除列表中时整组拒绝删除。组的已知成员来自本模块最近一次扫描；
+    ///    无扫描记录时按“传入 items 构成完整一组”处理（同组 ≥2 条即拒绝，
+    ///    单条目无法证明属于重复组则放行）。
+    /// 2. 内容漂移重验：扫描记录在案的路径，删除前重新计算 sampled hash，
+    ///    与扫描时不一致（扫描后内容已变，可能不再是重复）则拒绝该文件。
     public func clean(items: [CleanableItem], dryRun: Bool) async throws -> CleanupReport {
-        Deleter().delete(items: items, module: .duplicateFiles, dryRun: dryRun, useTrash: true)
+        let groupMembers = await scanRegistry.groupMembers
+        let fileRecords = await scanRegistry.fileRecords
+
+        var rejectedGroups: Set<String> = []
+        for (hash, groupItems) in Dictionary(grouping: items, by: { $0.subcategory ?? "" }) {
+            guard !hash.isEmpty else { continue }
+            if let known = groupMembers[hash] {
+                if known.isSubset(of: Set(groupItems.map(\.path))) {
+                    rejectedGroups.insert(hash)
+                }
+            } else if groupItems.count >= 2 {
+                rejectedGroups.insert(hash)
+            }
+        }
+
+        var allowed: [CleanableItem] = []
+        var rejected: [FailedItem] = []
+        for item in items {
+            if rejectedGroups.contains(item.subcategory ?? "") {
+                rejected.append(FailedItem(
+                    path: item.path,
+                    error: "整组删除会破坏“每组至少保留一份”不变量，已拒绝",
+                    reason: .unsafeTarget,
+                    expectedSize: item.size
+                ))
+                continue
+            }
+            if let record = fileRecords[item.path] {
+                let current = hasher.sampledHash(path: item.path, logicalSize: record.logicalSize)
+                if current != record.sampledHash {
+                    rejected.append(FailedItem(
+                        path: item.path,
+                        error: "扫描后文件内容已变化，可能不再是重复文件，已拒绝",
+                        reason: .contentModified,
+                        expectedSize: item.size
+                    ))
+                    continue
+                }
+            }
+            allowed.append(item)
+        }
+
+        let report = deleter.delete(items: allowed, module: .duplicateFiles, dryRun: dryRun, useTrash: true)
+        if !dryRun {
+            // 已删路径移出组记录：组内只剩一份时后续删除会被不变量拦截
+            await scanRegistry.removePaths(report.deletedItems.map(\.path))
+        }
+        return CleanupReport(
+            module: .duplicateFiles,
+            deletedItems: report.deletedItems,
+            failedItems: report.failedItems + rejected,
+            dryRun: dryRun,
+            expectedSize: items.reduce(Int64(0)) { $0 + $1.size },
+            actualFreed: report.actualFreed
+        )
     }
 
     /// 从 ScanResult 重建 DuplicateGroup 列表
@@ -130,8 +216,8 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
 
     // MARK: - Phase 1: 大小分桶
 
-    private func groupFilesBySize() -> [Int64: [FileMetadata]] {
-        FTSTraversalGate.withPermit {
+    private func groupFilesBySize() async throws -> [Int64: [FileMetadata]] {
+        try await FTSTraversalGate.withPermit {
             let cPath = scanRoot.withCString { strdup($0) }
             guard let cPath else { return [:] }
             defer { free(cPath) }
@@ -139,12 +225,14 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
             let skipDirs = self.skipDirectories
 
             var paths: [UnsafeMutablePointer<CChar>?] = [cPath, nil]
-            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR, nil) else { return [:] }
+            guard let fts = fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil) else { return [:] }
             defer { fts_close(fts) }
 
             var groups: [Int64: [FileMetadata]] = [:]
 
             while let entry = fts_read(fts) {
+                if Task.isCancelled { throw CancellationError() }
+
                 if entry.pointee.fts_info == FTS_D {
                     let dirPath = String(cString: entry.pointee.fts_path)
                     let dirName = (dirPath as NSString).lastPathComponent
@@ -219,23 +307,31 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         var result: [(size: Int64, sampled: [(object: PhysicalObject, hash: String)])] = []
 
         for (size, objects) in buckets {
-            let sampled: [(object: PhysicalObject, hash: String)?] = await withTaskGroup(
+            let sampled: [(object: PhysicalObject, hash: String)?] = try await withThrowingTaskGroup(
                 of: (Int, (object: PhysicalObject, hash: String)?).self
             ) { group in
                 for (index, object) in objects.enumerated() {
                     group.addTask {
-                        let hash = try? await context.hashTaskLimiter.withPermit {
-                            hasher.sampledHash(
-                                path: object.metadata.path,
-                                logicalSize: object.metadata.logicalSize
-                            )
+                        let hash: String?
+                        do {
+                            hash = try await context.hashTaskLimiter.withPermit {
+                                hasher.sampledHash(
+                                    path: object.metadata.path,
+                                    logicalSize: object.metadata.logicalSize
+                                )
+                            }
+                        } catch is CancellationError {
+                            // 取消必须传播，不能吞成 nil 当成读取失败
+                            throw CancellationError()
+                        } catch {
+                            hash = nil
                         }
-                        guard let hash = hash ?? nil else { return (index, nil) }
+                        guard let hash else { return (index, nil) }
                         return (index, (object, hash))
                     }
                 }
                 var collected: [(Int, (object: PhysicalObject, hash: String)?)] = []
-                for await pair in group {
+                for try await pair in group {
                     collected.append(pair)
                 }
                 return collected.sorted { $0.0 < $1.0 }.map(\.1)
@@ -269,8 +365,8 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         var groups: [ConfirmedGroup] = []
 
         for (_, sampled) in sampledGroups {
-            let confirmed: [(object: PhysicalObject, fullHash: String)?] = try await withThrowingTaskGroup(
-                of: (Int, (object: PhysicalObject, fullHash: String)?).self
+            let confirmed: [(object: PhysicalObject, sampledHash: String, fullHash: String)?] = try await withThrowingTaskGroup(
+                of: (Int, (object: PhysicalObject, sampledHash: String, fullHash: String)?).self
             ) { group in
                 for (index, entry) in sampled.enumerated() {
                     group.addTask {
@@ -278,7 +374,7 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
                             let fullHash = try await context.hashTaskLimiter.withPermit {
                                 try await cache.fullHash(for: entry.object.metadata)
                             }
-                            return (index, (entry.object, fullHash))
+                            return (index, (entry.object, entry.hash, fullHash))
                         } catch is CancellationError {
                             throw CancellationError()
                         } catch {
@@ -287,7 +383,7 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
                         }
                     }
                 }
-                var collected: [(Int, (object: PhysicalObject, fullHash: String)?)] = []
+                var collected: [(Int, (object: PhysicalObject, sampledHash: String, fullHash: String)?)] = []
                 for try await pair in group {
                     collected.append(pair)
                 }
@@ -295,18 +391,18 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
             }
 
             // 按 full hash 分组，≥2 个不同物理对象才形成重复组
-            var byHash: [String: [PhysicalObject]] = [:]
+            var byHash: [String: [(object: PhysicalObject, sampledHash: String)]] = [:]
             var hashOrder: [String] = []
             for case let entry? in confirmed {
                 if byHash[entry.fullHash] == nil { hashOrder.append(entry.fullHash) }
-                byHash[entry.fullHash, default: []].append(entry.object)
+                byHash[entry.fullHash, default: []].append((entry.object, entry.sampledHash))
             }
 
             for hash in hashOrder {
                 guard let objects = byHash[hash], objects.count >= 2 else { continue }
                 // 组内必须含 ≥2 个不同 inode（同 inode 硬链接不构成重复组）
                 let distinctInodes = Set(objects.map {
-                    "\($0.metadata.identity.device):\($0.metadata.identity.inode)"
+                    "\($0.object.metadata.identity.device):\($0.object.metadata.identity.inode)"
                 })
                 guard distinctInodes.count >= 2 else { continue }
                 groups.append(ConfirmedGroup(id: hash, objects: objects))
@@ -314,6 +410,8 @@ public struct DuplicateFilesModule: CleanerModule, Sendable {
         }
 
         try Task.checkCancellation()
+        // 显式落盘点：本阶段累计的新 hash 一次性批量写盘
+        await cache.flush()
         return groups
     }
 }

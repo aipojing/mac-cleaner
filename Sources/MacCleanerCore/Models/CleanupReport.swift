@@ -95,6 +95,8 @@ public enum FailureReason: String, Sendable {
     case identityChanged = "identity_changed"
     /// 无法确认目标身份
     case identityUnavailable = "identity_unavailable"
+    /// 文件内容（修改时间/大小）在扫描后发生变化
+    case contentModified = "content_modified"
     /// 其他未知错误
     case unknown = "unknown"
 
@@ -107,6 +109,7 @@ public enum FailureReason: String, Sendable {
         case .unsafeTarget: return "本地安全校验未通过，已拒绝执行"
         case .identityChanged: return "文件在扫描后已被替换，已拒绝执行"
         case .identityUnavailable: return "无法确认文件身份，已拒绝执行"
+        case .contentModified: return "文件内容在扫描后已变化，已拒绝执行"
         case .unknown: return "未知错误"
         }
     }

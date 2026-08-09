@@ -76,11 +76,30 @@ struct FileHashCacheTests {
         let first = FileHashCache(fileURL: url, hasher: hasher)
         let metadata = FileMetadata.fixture(device: 7, inode: 8, logicalSize: 64, mtime: 42)
         _ = try await first.fullHash(for: metadata)
+        // 批量落盘策略：单条插入不立即写盘，需显式 flush
+        await first.flush()
 
         let second = FileHashCache(fileURL: url, hasher: hasher)
         let hash = try await second.fullHash(for: metadata)
         #expect(hash == "full")
         #expect(await hasher.fullHashCalls == 1)
+    }
+
+    @Test("累计达到批量间隔的新条目自动落盘")
+    func batchesPersistsAfterInterval() async throws {
+        let url = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let hasher = CountingFileHasher(fullHash: "full")
+        let first = FileHashCache(fileURL: url, hasher: hasher, persistInterval: 3)
+        for i in 0..<3 {
+            _ = try await first.fullHash(
+                for: .fixture(device: 1, inode: UInt64(100 + i), logicalSize: 64, mtime: 1)
+            )
+        }
+
+        let second = FileHashCache(fileURL: url, hasher: hasher)
+        #expect(await second.count == 3)
     }
 
     @Test("符号链接和目录不进入缓存")

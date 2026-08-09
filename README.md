@@ -19,7 +19,7 @@ DevClean 帮助开发者找出 Xcode、模拟器、包管理器、Docker、AI �
 ## 能做什么
 
 - 扫描开发环境中常见的缓存、构建产物、日志、旧 SDK 与大文件。
-- 在桌面端查看扫描结果、磁盘树、重复文件、应用残留和进程信息。
+- 在桌面端查看扫描结果、磁盘树、重复文件、应用残留、内存和进程信息。
 - 在 CLI 中输出可脚本化的 JSON 扫描结果，或按模块、按预设方案清理。
 - 对删除目标执行路径范围、受保护目录、符号链接和文件身份校验。
 - 可选接入 DeepSeek，为已选项目或进程提供解释与风险建议；主界面的 AI 设置页可选择 DeepSeek V4 Flash 或 V4 Pro，并配置 HTTPS Base URL（默认 `https://api.deepseek.com`）；AI 不会自动选择、删除文件或结束进程。
@@ -153,11 +153,7 @@ swift build
 swift test
 ```
 
-`swift test` 覆盖 `Tests/MacCleanerTests`（Core 与 CLI）；桌面端 ViewModel 测试还需要运行：
-
-```bash
-xcodebuild test -project MacCleaner.xcodeproj -scheme MacCleanerApp -destination 'platform=macOS'
-```
+`swift test` 只覆盖 `Tests/MacCleanerTests`（Core 与 CLI）；`Tests/MacCleanerAppTests` 不在 SwiftPM 测试目标内，CI 或完整验证需要额外运行 `xcodebuild test -project MacCleaner.xcodeproj -scheme MacCleanerApp -destination 'platform=macOS'`。
 
 新增清理规则时，请优先在 `MacCleanerCore` 中实现模块逻辑，并为扫描范围、过滤逻辑和删除边界补充确定性的测试。涉及真实删除时，先以 `--dry-run` 验证实际候选路径。
 

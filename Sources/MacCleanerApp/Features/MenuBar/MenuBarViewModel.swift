@@ -11,11 +11,20 @@ final class MenuBarViewModel {
     /// 定时扫描是否已启用
     var isScheduledScanEnabled = false
 
-    private let monitor = DiskSpaceMonitor.shared
-    private var monitorTask: Task<Void, Never>?
-    private var scheduledCheckTask: Task<Void, Never>?
+    private let monitor: DiskSpaceMonitor
+    /// `private(set)` 仅供测试观察任务是否被重复创建。
+    private(set) var monitorTask: Task<Void, Never>?
+    private(set) var scheduledCheckTask: Task<Void, Never>?
+
+    init(monitor: DiskSpaceMonitor = .shared) {
+        self.monitor = monitor
+    }
 
     func start() {
+        // 幂等：MenuBarPopoverView.onAppear 每次打开 popover 都会调用 start()，
+        // 已有任务在运行时直接返回，避免累积永久轮询任务。
+        guard monitorTask == nil, scheduledCheckTask == nil else { return }
+
         monitorTask = Task {
             await monitor.start(interval: 300)
             for await info in await monitor.updates {

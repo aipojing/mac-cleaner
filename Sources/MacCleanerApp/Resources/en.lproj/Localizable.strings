@@ -92,12 +92,6 @@
 "搜索进程名或描述…" = "Search process name…";
 "手动刷新" = "Refresh";
 
-/* === MemoryCleanerView === */
-"内存清理" = "Memory Cleaner";
-"内存压力" = "Memory Pressure";
-"正在清理内存..." = "Cleaning memory...";
-"清理内存" = "Clean Memory";
-
 /* === MenuBarPopoverView === */
 "磁盘空间不足！" = "Low Disk Space!";
 "可用" = "Available";

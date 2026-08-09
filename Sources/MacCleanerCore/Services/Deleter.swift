@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public struct Deleter: Sendable {
     private let policyCatalog: any DeletionPolicyProviding
@@ -37,10 +38,14 @@ public struct Deleter: Sendable {
             onProgress?(item.displayName, index + 1, total)
 
             // 执行前（含 dry-run）统一验证：允许根、受保护路径、
-            // 符号链接、扫描后身份是否变化。失败只记录，不降级删除。
-            if let failure = validate(item, with: guardrail) {
+            // 符号链接、扫描后身份是否变化，以及强制模块的内容漂移。
+            // 失败只记录，不降级删除。
+            switch validate(item, with: guardrail, enforceContentDrift: policy.rejectOnContentDrift) {
+            case .failure(let failure):
                 failed.append(failure)
                 continue
+            case .success:
+                break
             }
 
             if dryRun {
@@ -50,20 +55,28 @@ public struct Deleter: Sendable {
 
             // 真正执行前再验证一次身份：校验与删除之间目标可能被替换，
             // 缩小路径替换竞态窗口；失败同样只记录不删除。
-            if let failure = validate(item, with: guardrail) {
+            // 删除直接使用本次验证返回的规范化路径（父目录符号链接已解析），
+            // 避免校验与删除各做一次路径解析导致删除被重定向。
+            // 这只能缩小 TOCTOU 窗口而非消除；彻底方案需基于目录 fd 的
+            // unlinkat（当前未实现）。
+            let executionPath: String
+            switch validate(item, with: guardrail, enforceContentDrift: policy.rejectOnContentDrift) {
+            case .failure(let failure):
                 failed.append(failure)
                 continue
+            case .success(let canonicalPath):
+                executionPath = canonicalPath
             }
 
             do {
                 if useTrash {
-                    try fm.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                    try fm.trashItem(at: URL(fileURLWithPath: executionPath), resultingItemURL: nil)
                 } else {
-                    try fm.removeItem(atPath: item.path)
+                    try fm.removeItem(atPath: executionPath)
                 }
 
-                // 删除后验证：确认原始路径已不存在
-                let verified = !fm.fileExists(atPath: item.path)
+                // 删除后验证：确认目标已不存在
+                let verified = !fm.fileExists(atPath: executionPath)
                 // 移到废纸篓的文件还占用磁盘空间，直到用户清空废纸篓
                 let freed = useTrash ? Int64(0) : (verified ? item.size : 0)
                 deleted.append(CleanedItem(
@@ -97,26 +110,65 @@ public struct Deleter: Sendable {
         )
     }
 
-    /// 验证单个条目；失败返回 FailedItem，成功返回 nil。
-    private func validate(_ item: CleanableItem, with guardrail: DeletionGuard) -> FailedItem? {
+    /// 单条目验证结果：成功给出用于执行删除的规范化路径，失败给出 FailedItem。
+    private enum ValidationOutcome {
+        case success(String)
+        case failure(FailedItem)
+    }
+
+    /// 验证单个条目；成功返回用于执行删除的规范化路径，失败返回 FailedItem。
+    private func validate(
+        _ item: CleanableItem,
+        with guardrail: DeletionGuard,
+        enforceContentDrift: Bool
+    ) -> ValidationOutcome {
+        let target: DeletionGuard.ValidatedTarget
         do {
-            _ = try guardrail.validate(path: item.path, expectedIdentity: item.fileIdentity)
-            return nil
+            target = try guardrail.validatedTarget(path: item.path, expectedIdentity: item.fileIdentity)
         } catch let guardError as DeletionGuardError {
-            return FailedItem(
+            return .failure(FailedItem(
                 path: item.path,
                 error: Self.describe(guardError),
                 reason: Self.reason(for: guardError),
                 expectedSize: item.size
-            )
+            ))
         } catch {
-            return FailedItem(
+            return .failure(FailedItem(
                 path: item.path,
                 error: "无法确认文件身份",
                 reason: .identityUnavailable,
                 expectedSize: item.size
-            )
+            ))
         }
+
+        // 内容漂移检测：身份（device/inode）未变不代表内容未变，
+        // 文件可能在扫描后被原地改写。只对策略开启的模块（large-files）强制。
+        if enforceContentDrift, contentDrifted(item, at: target.canonicalPath) {
+            return .failure(FailedItem(
+                path: item.path,
+                error: "文件内容在扫描后已变化（修改时间或大小不一致）",
+                reason: .contentModified,
+                expectedSize: item.size
+            ))
+        }
+
+        return .success(target.canonicalPath)
+    }
+
+    /// 对验证过的规范化路径重新 lstat，比对扫描时记录的 mtime（纳秒）与 size。
+    /// 未记录指纹的条目（旧构造点、合并条目、读取失败）跳过检测；
+    /// lstat 失败按漂移处理（拒绝删除）。
+    private func contentDrifted(_ item: CleanableItem, at canonicalPath: String) -> Bool {
+        guard let expectedMtime = item.recordedModificationNanoseconds,
+              let expectedSize = item.recordedContentSize
+        else { return false }
+
+        var st = stat()
+        guard lstat(canonicalPath, &st) == 0 else { return true }
+
+        let currentMtime = Int64(st.st_mtimespec.tv_sec) * 1_000_000_000
+            + Int64(st.st_mtimespec.tv_nsec)
+        return currentMtime != expectedMtime || Int64(st.st_size) != expectedSize
     }
 
     /// 将 guard 拒绝原因映射到报告失败原因。
