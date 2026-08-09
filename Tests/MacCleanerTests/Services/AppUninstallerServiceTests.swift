@@ -17,15 +17,14 @@ struct AppUninstallerServiceTests {
         let uniqueSuffix = UUID().uuidString
         let vendor = "UninstallerTestVendor\(uniqueSuffix)"
         let product = "Browser"
-        let home = DiskScanner.homeDirectory
+        let home = makeTempDir()
         let applicationSupportVendor = "\(home)/Library/Application Support/\(vendor)"
         let cacheVendor = "\(home)/Library/Caches/\(vendor)"
         let applicationSupportProduct = "\(applicationSupportVendor)/\(product)"
         let cacheProduct = "\(cacheVendor)/\(product)"
         let unrelatedProduct = "\(applicationSupportVendor)/OtherApp"
         defer {
-            try? FileManager.default.removeItem(atPath: applicationSupportVendor)
-            try? FileManager.default.removeItem(atPath: cacheVendor)
+            try? FileManager.default.removeItem(atPath: home)
         }
 
         for path in [applicationSupportProduct, cacheProduct, unrelatedProduct] {
@@ -42,7 +41,7 @@ struct AppUninstallerServiceTests {
             bundleSize: 0
         )
 
-        let residuals = await AppUninstallerService().findResiduals(for: app)
+        let residuals = await AppUninstallerService(homeDirectory: home).findResiduals(for: app)
         let paths = Set(residuals.groups.flatMap(\.items).map(\.path))
 
         #expect(paths.contains(applicationSupportProduct))

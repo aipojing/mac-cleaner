@@ -7,10 +7,11 @@ public actor AppUninstallerService {
 
     public init(
         scanner: DiskScanner = DiskScanner(),
-        identityProvider: any FileIdentityProviding = POSIXFileIdentityProvider()
+        identityProvider: any FileIdentityProviding = POSIXFileIdentityProvider(),
+        homeDirectory: String = DiskScanner.homeDirectory
     ) {
         self.scanner = scanner
-        self.home = DiskScanner.homeDirectory
+        self.home = homeDirectory
         self.identityProvider = identityProvider
     }
 
