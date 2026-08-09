@@ -38,7 +38,7 @@ DevClean 帮助开发者找出 Xcode、模拟器、包管理器、Docker、AI �
 | Android SDK | `android-sdk` | 旧版 platforms、build-tools、NDK、system images 与 AVD |
 | 大文件 | `large-files` | 主目录中的大文件；桌面端可选 100 / 200 / 500 MB / 1 GB 阈值（默认 100 MB） |
 
-桌面应用还提供应用卸载及残留扫描、重复文件查找、磁盘可视化、内存清理和活动监视器。点击“大文件清理”可选择扫描阈值；阈值越高，候选越少，扫描通常更快。扫描进行时，扫描页会流式展示已发现的候选（Top 50），排名随扫描进展持续更新。
+桌面应用还提供应用卸载及残留扫描、重复文件查找、磁盘可视化和活动监视器。点击“大文件清理”可选择扫描阈值；阈值越高，候选越少，扫描通常更快。扫描进行时，扫描页会流式展示已发现的候选（Top 50），排名随扫描进展持续更新。
 
 ## 环境要求
 
@@ -151,6 +151,12 @@ Package.swift             # Swift Package 定义
 ```bash
 swift build
 swift test
+```
+
+`swift test` 覆盖 `Tests/MacCleanerTests`（Core 与 CLI）；桌面端 ViewModel 测试还需要运行：
+
+```bash
+xcodebuild test -project MacCleaner.xcodeproj -scheme MacCleanerApp -destination 'platform=macOS'
 ```
 
 新增清理规则时，请优先在 `MacCleanerCore` 中实现模块逻辑，并为扫描范围、过滤逻辑和删除边界补充确定性的测试。涉及真实删除时，先以 `--dry-run` 验证实际候选路径。
