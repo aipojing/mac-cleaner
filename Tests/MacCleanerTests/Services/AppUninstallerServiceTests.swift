@@ -12,6 +12,44 @@ struct AppUninstallerServiceTests {
         return path
     }
 
+    @Test("发现厂商目录下匹配产品的支持文件和缓存，不带入同厂商其他产品")
+    func findsNestedVendorProductResiduals() async throws {
+        let uniqueSuffix = UUID().uuidString
+        let vendor = "UninstallerTestVendor\(uniqueSuffix)"
+        let product = "Browser"
+        let home = DiskScanner.homeDirectory
+        let applicationSupportVendor = "\(home)/Library/Application Support/\(vendor)"
+        let cacheVendor = "\(home)/Library/Caches/\(vendor)"
+        let applicationSupportProduct = "\(applicationSupportVendor)/\(product)"
+        let cacheProduct = "\(cacheVendor)/\(product)"
+        let unrelatedProduct = "\(applicationSupportVendor)/OtherApp"
+        defer {
+            try? FileManager.default.removeItem(atPath: applicationSupportVendor)
+            try? FileManager.default.removeItem(atPath: cacheVendor)
+        }
+
+        for path in [applicationSupportProduct, cacheProduct, unrelatedProduct] {
+            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+            let file = (path as NSString).appendingPathComponent("fixture")
+            try Data(repeating: 0x1, count: 1_024).write(to: URL(fileURLWithPath: file))
+        }
+
+        let app = InstalledApp(
+            name: "\(vendor) \(product)",
+            bundleID: "com.\(vendor).\(product)",
+            version: "1.0",
+            path: "/Applications/\(product).app",
+            bundleSize: 0
+        )
+
+        let residuals = await AppUninstallerService().findResiduals(for: app)
+        let paths = Set(residuals.groups.flatMap(\.items).map(\.path))
+
+        #expect(paths.contains(applicationSupportProduct))
+        #expect(paths.contains(cacheProduct))
+        #expect(!paths.contains(unrelatedProduct))
+    }
+
     @Test("残留在扫描后被替换时不进入废纸篓")
     func residualIdentityChangeRefusesDeletion() async throws {
         let dir = makeTempDir()

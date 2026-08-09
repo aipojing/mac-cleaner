@@ -134,21 +134,33 @@ public actor AppUninstallerService {
     // MARK: - 查找残留文件
 
     public func findResiduals(for app: InstalledApp) async -> AppResidualFiles {
+        let applicationSupportPaths = [
+            "\(home)/Library/Application Support/\(app.bundleID)",
+            "\(home)/Library/Application Support/\(app.name)",
+        ] + findNestedVendorProductDirectories(
+            root: "\(home)/Library/Application Support",
+            app: app
+        )
+        let cachePaths = [
+            "\(home)/Library/Caches/\(app.bundleID)",
+        ] + findNestedVendorProductDirectories(
+            root: "\(home)/Library/Caches",
+            app: app
+        )
+        let logPaths = [
+            "\(home)/Library/Logs/\(app.bundleID)",
+            "\(home)/Library/Logs/\(app.name)",
+        ] + findNestedVendorProductDirectories(
+            root: "\(home)/Library/Logs",
+            app: app
+        )
         let locations: [(id: String, label: String, paths: [String])] = [
-            ("app-support", "Application Support", [
-                "\(home)/Library/Application Support/\(app.bundleID)",
-                "\(home)/Library/Application Support/\(app.name)",
-            ]),
+            ("app-support", "Application Support", applicationSupportPaths),
             ("preferences", "Preferences",
                 findMatchingPreferences(appName: app.name, bundleID: app.bundleID)
             ),
-            ("caches", "Caches", [
-                "\(home)/Library/Caches/\(app.bundleID)",
-            ]),
-            ("logs", "Logs", [
-                "\(home)/Library/Logs/\(app.bundleID)",
-                "\(home)/Library/Logs/\(app.name)",
-            ]),
+            ("caches", "Caches", cachePaths),
+            ("logs", "Logs", logPaths),
             ("launch-agents", "LaunchAgents",
                 findMatchingLaunchAgents(app: app)
             ),
@@ -219,6 +231,43 @@ public actor AppUninstallerService {
         }
 
         return items
+    }
+
+    /// 有些应用把数据置于厂商/产品两层目录，例如
+    /// `Library/Application Support/Google/Chrome`。只返回产品子目录，
+    /// 不将整个厂商目录（可能包含其他应用数据）作为卸载候选。
+    private func findNestedVendorProductDirectories(root: String, app: InstalledApp) -> [String] {
+        let bundleComponents = app.bundleID.split(separator: ".").map(String.init)
+        guard bundleComponents.count >= 2,
+              let vendor = bundleComponents.dropLast().last,
+              let bundleProduct = bundleComponents.last
+        else { return [] }
+
+        let productNames = [
+            bundleProduct,
+            app.name,
+            app.name.split(whereSeparator: \.isWhitespace).last.map(String.init),
+        ].compactMap { $0 }
+
+        let fm = FileManager.default
+        guard let vendorName = try? fm.contentsOfDirectory(atPath: root).first(where: {
+            $0.localizedCaseInsensitiveCompare(vendor) == .orderedSame
+        }) else { return [] }
+
+        let vendorPath = (root as NSString).appendingPathComponent(vendorName)
+        guard let contents = try? fm.contentsOfDirectory(atPath: vendorPath) else { return [] }
+        return contents.compactMap { name in
+            guard productNames.contains(where: {
+                name.localizedCaseInsensitiveCompare($0) == .orderedSame
+            }) else { return nil }
+
+            let path = (vendorPath as NSString).appendingPathComponent(name)
+            var isDirectory = ObjCBool(false)
+            guard fm.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue else {
+                return nil
+            }
+            return path
+        }
     }
 
     // MARK: - 边界匹配（替代旧子串匹配）
