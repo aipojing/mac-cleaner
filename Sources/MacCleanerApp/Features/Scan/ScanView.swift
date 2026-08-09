@@ -5,6 +5,7 @@ struct ScanView: View {
     @Bindable var viewModel: ScanViewModel
     var onNavigate: ((String) -> Void)?
     @AppStorage(LargeFileThreshold.storageKey) private var largeFileMinimumSizeMB = LargeFileThreshold.default.rawValue
+    @State private var showsLargeFileThresholdPicker = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -211,12 +212,6 @@ struct ScanView: View {
                 )
                 largeFilesToolCard
                 toolCard(
-                    icon: "memorychip", colors: [.mint, .teal],
-                    title: "内存清理",
-                    subtitle: "释放内存压力，加速系统",
-                    key: "memoryCleaner"
-                )
-                toolCard(
                     icon: "waveform.badge.magnifyingglass", colors: [.purple, .indigo],
                     title: "活动监视器",
                     subtitle: "查看进程用途，安全终止",
@@ -232,17 +227,8 @@ struct ScanView: View {
     }
 
     private var largeFilesToolCard: some View {
-        Menu {
-            Text("阈值越高，候选越少，扫描通常更快。")
-                .foregroundStyle(.secondary)
-            Divider()
-
-            ForEach(LargeFileThreshold.allCases) { threshold in
-                Button("扫描 \(threshold.displayName) 以上的文件\(threshold == selectedLargeFileThreshold ? "（当前）" : "")") {
-                    largeFileMinimumSizeMB = threshold.rawValue
-                    startLargeFileScan(with: threshold)
-                }
-            }
+        Button {
+            showsLargeFileThresholdPicker = true
         } label: {
             VStack(spacing: 10) {
                 GradientIconBadge(icon: "doc.badge.gearshape", size: 56, colors: [.orange, .yellow])
@@ -262,7 +248,46 @@ struct ScanView: View {
             .padding(.vertical, 20)
             .brandCard()
         }
-        .menuStyle(.borderlessButton)
+        .buttonStyle(BrandCardButtonStyle())
+        .popover(isPresented: $showsLargeFileThresholdPicker, arrowEdge: .bottom) {
+            largeFileThresholdPicker
+        }
+    }
+
+    private var largeFileThresholdPicker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("选择大文件阈值")
+                .font(.headline)
+            Text("阈值越高，候选越少，扫描通常更快。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(LargeFileThreshold.allCases) { threshold in
+                Button {
+                    largeFileMinimumSizeMB = threshold.rawValue
+                    showsLargeFileThresholdPicker = false
+                    startLargeFileScan(with: threshold)
+                } label: {
+                    HStack {
+                        Text("扫描 \(threshold.displayName) 以上的文件")
+                        Spacer()
+                        if threshold == selectedLargeFileThreshold {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+            }
+
+            HStack {
+                Spacer()
+                Button("取消") {
+                    showsLargeFileThresholdPicker = false
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
     }
 
     private func toolCard(icon: String, colors: [Color], title: String, subtitle: String, key: String) -> some View {
