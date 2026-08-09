@@ -2,7 +2,7 @@ import Foundation
 import MacCleanerCore
 
 /// App 层 AI 服务边界：只暴露状态查询、显式分析和取消。
-/// `state`/`states` 只读 Keychain 配置状态与本地缓存，不触发网络请求；
+/// `state`/`states` 只读 API Key 配置状态与本地缓存，不触发网络请求；
 /// `analyze` 必须由用户显式动作触发。
 protocol AIAnalysisServing: Sendable {
     func state(for subject: AIAssessmentSubject) async throws -> AIAssessmentState
@@ -33,6 +33,16 @@ final class AppEnvironment {
     let privacyConsentStore: any AIPrivacyConsentStoring
     let connectionChecker: any DeepSeekConnectionChecking
     let assessmentCache: any AIAssessmentCacheStatsProviding
+    let deepSeekConfigurationStore: any DeepSeekConfigurationManaging
+
+    /// 设置页状态全局只创建一次，避免重算 body 时丢失正在编辑的服务配置。
+    lazy var aiSettingsViewModel = AISettingsViewModel(
+        keyStore: apiKeyStore,
+        consentStore: privacyConsentStore,
+        connectionChecker: connectionChecker,
+        cache: assessmentCache,
+        configurationStore: deepSeekConfigurationStore
+    )
 
     init(
         aiService: any AIAnalysisServing,
@@ -40,7 +50,8 @@ final class AppEnvironment {
         apiKeyStore: any APIKeyManaging,
         privacyConsentStore: any AIPrivacyConsentStoring,
         connectionChecker: any DeepSeekConnectionChecking,
-        assessmentCache: any AIAssessmentCacheStatsProviding
+        assessmentCache: any AIAssessmentCacheStatsProviding,
+        deepSeekConfigurationStore: any DeepSeekConfigurationManaging
     ) {
         self.aiService = aiService
         self.subjectFactory = subjectFactory
@@ -48,13 +59,15 @@ final class AppEnvironment {
         self.privacyConsentStore = privacyConsentStore
         self.connectionChecker = connectionChecker
         self.assessmentCache = assessmentCache
+        self.deepSeekConfigurationStore = deepSeekConfigurationStore
     }
 
     static func production() -> AppEnvironment {
-        let keyStore = KeychainAPIKeyStore()
+        let keyStore = UserDefaultsAPIKeyStore()
+        let configurationStore = UserDefaultsDeepSeekConfigurationStore()
         let cache = AIAssessmentCache()
         let client = DeepSeekAssessmentClient(
-            configuration: DeepSeekConfiguration(),
+            configurationProvider: configurationStore,
             keyStore: keyStore,
             transport: URLSessionHTTPTransport()
         )
@@ -67,7 +80,8 @@ final class AppEnvironment {
             apiKeyStore: keyStore,
             privacyConsentStore: UserDefaultsAIPrivacyConsentStore(),
             connectionChecker: client,
-            assessmentCache: cache
+            assessmentCache: cache,
+            deepSeekConfigurationStore: configurationStore
         )
     }
 }

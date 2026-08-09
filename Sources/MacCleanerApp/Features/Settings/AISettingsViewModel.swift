@@ -20,31 +20,31 @@ final class AISettingsViewModel {
     var cacheStats: AIAssessmentCache.Stats?
     var presentPrivacyConsent: Bool = false
     var errorMessage: String?
-
-    /// 当前模型（只读展示，可升级配置）
-    let model: String
-    /// DeepSeek API Base URL（只读展示）
-    let baseURL: String
+    var modelInput: String
+    var baseURLInput: String
+    var serviceConfigurationErrorMessage: String?
 
     private let keyStore: any APIKeyManaging
     private let consentStore: any AIPrivacyConsentStoring
     private let connectionChecker: any DeepSeekConnectionChecking
     private let cache: any AIAssessmentCacheStatsProviding
+    private let configurationStore: any DeepSeekConfigurationManaging
 
     init(
         keyStore: any APIKeyManaging,
         consentStore: any AIPrivacyConsentStoring,
         connectionChecker: any DeepSeekConnectionChecking,
         cache: any AIAssessmentCacheStatsProviding,
-        model: String = DeepSeekConfiguration.defaultModel,
-        baseURL: String = DeepSeekConfiguration.defaultBaseURL.absoluteString
+        configurationStore: any DeepSeekConfigurationManaging
     ) {
         self.keyStore = keyStore
         self.consentStore = consentStore
         self.connectionChecker = connectionChecker
         self.cache = cache
-        self.model = model
-        self.baseURL = baseURL
+        self.configurationStore = configurationStore
+        let configuration = configurationStore.configuration()
+        self.modelInput = configuration.model
+        self.baseURLInput = configuration.baseURL.absoluteString
     }
 
     /// 载入配置状态和缓存统计。绝不回读 key 明文。
@@ -53,6 +53,10 @@ final class AISettingsViewModel {
         cacheStats = try? await cache.stats()
         connectionState = .idle
         errorMessage = nil
+        serviceConfigurationErrorMessage = nil
+        let configuration = configurationStore.configuration()
+        modelInput = configuration.model
+        baseURLInput = configuration.baseURL.absoluteString
     }
 
     /// 保存 key 前必须确认完整路径发送说明。
@@ -106,6 +110,27 @@ final class AISettingsViewModel {
     func clearCache() async {
         try? await cache.removeAll()
         cacheStats = try? await cache.stats()
+    }
+
+    /// 保存模型 ID 和 Base URL；client 会在下一次请求时读取最新值。
+    func saveServiceConfiguration() {
+        do {
+            try configurationStore.update(model: modelInput, baseURL: baseURLInput)
+            let configuration = configurationStore.configuration()
+            modelInput = configuration.model
+            baseURLInput = configuration.baseURL.absoluteString
+            serviceConfigurationErrorMessage = nil
+            connectionState = .idle
+        } catch let error as DeepSeekConfigurationStoreError {
+            switch error {
+            case .invalidModel:
+                serviceConfigurationErrorMessage = "请输入模型 ID"
+            case .invalidBaseURL:
+                serviceConfigurationErrorMessage = "请输入有效的 HTTPS Base URL"
+            }
+        } catch {
+            serviceConfigurationErrorMessage = "保存服务配置失败，请重试"
+        }
     }
 
     // MARK: - 私有

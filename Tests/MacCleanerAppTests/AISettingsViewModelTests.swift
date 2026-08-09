@@ -8,13 +8,15 @@ extension AISettingsViewModel {
         keyStore: InMemoryAPIKeyStore = InMemoryAPIKeyStore(),
         consentStore: InMemoryAIPrivacyConsentStore = InMemoryAIPrivacyConsentStore(),
         connectionChecker: StubConnectionChecker = StubConnectionChecker(),
-        cache: StubAssessmentCache = StubAssessmentCache()
+        cache: StubAssessmentCache = StubAssessmentCache(),
+        configurationStore: InMemoryDeepSeekConfigurationStore = InMemoryDeepSeekConfigurationStore()
     ) -> AISettingsViewModel {
         AISettingsViewModel(
             keyStore: keyStore,
             consentStore: consentStore,
             connectionChecker: connectionChecker,
-            cache: cache
+            cache: cache,
+            configurationStore: configurationStore
         )
     }
 }
@@ -22,6 +24,22 @@ extension AISettingsViewModel {
 @MainActor
 @Suite("AI settings view model")
 struct AISettingsViewModelTests {
+    @Test("保存服务配置会更新模型 ID 和 Base URL")
+    func savesServiceConfiguration() throws {
+        let configurationStore = InMemoryDeepSeekConfigurationStore()
+        let viewModel = AISettingsViewModel.fixture(configurationStore: configurationStore)
+        viewModel.modelInput = "deepseek-v4-flash"
+        viewModel.baseURLInput = "https://api.deepseek.com/beta"
+
+        viewModel.saveServiceConfiguration()
+
+        #expect(configurationStore.configuration() == .init(
+            baseURL: URL(string: "https://api.deepseek.com/beta")!,
+            model: "deepseek-v4-flash"
+        ))
+        #expect(viewModel.serviceConfigurationErrorMessage == nil)
+    }
+
     @Test("载入设置不回填明文 key")
     func neverLoadsPlaintextKey() async {
         let keyStore = InMemoryAPIKeyStore(key: "sk-existing")

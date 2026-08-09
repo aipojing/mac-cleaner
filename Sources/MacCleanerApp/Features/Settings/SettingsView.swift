@@ -18,12 +18,7 @@ struct SettingsView: View {
                     Label("语言", systemImage: "globe")
                 }
 
-            AISettingsView(viewModel: AISettingsViewModel(
-                keyStore: environment.apiKeyStore,
-                consentStore: environment.privacyConsentStore,
-                connectionChecker: environment.connectionChecker,
-                cache: environment.assessmentCache
-            ))
+            AISettingsView(viewModel: environment.aiSettingsViewModel)
             .tabItem {
                 Label("AI", systemImage: "sparkles")
             }

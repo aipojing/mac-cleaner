@@ -2,7 +2,7 @@ import SwiftUI
 import MacCleanerCore
 
 /// AI 设置页：DeepSeek Key、连接测试、隐私说明和缓存管理。
-/// Key 只写入 Keychain，不回显完整内容。
+/// Key 写入本机应用偏好，不回显完整内容。
 struct AISettingsView: View {
     @Bindable var viewModel: AISettingsViewModel
 
@@ -28,8 +28,12 @@ struct AISettingsView: View {
                     }
                 }
 
-                SecureField("输入 API Key（保存在系统钥匙串）", text: $viewModel.apiKeyInput)
+                SecureField("输入 API Key（保存在本机应用设置）", text: $viewModel.apiKeyInput)
                     .textFieldStyle(.roundedBorder)
+
+                Text("不会写入系统钥匙串；仅保存在这台 Mac 的应用偏好中。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 HStack {
                     Button("保存") {
@@ -53,8 +57,21 @@ struct AISettingsView: View {
             }
 
             Section("服务信息") {
-                LabeledContent("模型", value: viewModel.model)
-                LabeledContent("Base URL", value: viewModel.baseURL)
+                TextField("模型 ID", text: $viewModel.modelInput)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Base URL", text: $viewModel.baseURLInput)
+                    .textFieldStyle(.roundedBorder)
+                Text("当前默认值使用 /beta：这是 DeepSeek strict tool-call 的官方要求。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("保存服务配置") {
+                    viewModel.saveServiceConfiguration()
+                }
+                if let message = viewModel.serviceConfigurationErrorMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
 
             Section("AI 缓存") {

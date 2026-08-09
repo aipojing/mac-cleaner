@@ -36,7 +36,7 @@ public enum DeepSeekClientError: Error, Equatable, Sendable {
 public struct DeepSeekAssessmentClient: AIAssessmentProviding {
     public static let maxSubjectsPerRequest = 10
 
-    private let configuration: DeepSeekConfiguration
+    private let configurationProvider: any DeepSeekConfigurationProviding
     private let keyStore: any APIKeyProviding
     private let transport: any HTTPTransporting
     private let now: @Sendable () -> Date
@@ -47,7 +47,21 @@ public struct DeepSeekAssessmentClient: AIAssessmentProviding {
         transport: any HTTPTransporting = URLSessionHTTPTransport(),
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
-        self.configuration = configuration
+        self.configurationProvider = FixedDeepSeekConfigurationProvider(configuration: configuration)
+        self.keyStore = keyStore
+        self.transport = transport
+        self.now = now
+    }
+
+    /// 使用可变配置源构建 client。每次分析和连接测试都会读取最新配置，
+    /// 因而设置页保存模型 ID 或 Base URL 后无需重启应用。
+    public init(
+        configurationProvider: any DeepSeekConfigurationProviding,
+        keyStore: any APIKeyProviding,
+        transport: any HTTPTransporting = URLSessionHTTPTransport(),
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.configurationProvider = configurationProvider
         self.keyStore = keyStore
         self.transport = transport
         self.now = now
@@ -84,6 +98,7 @@ public struct DeepSeekAssessmentClient: AIAssessmentProviding {
 
     /// key 只进入 Authorization 请求头，不写入日志或缓存。
     private func buildRequest(subjects: [AIAssessmentSubject], apiKey: String) throws -> URLRequest {
+        let configuration = configurationProvider.configuration()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let subjectsJSON = String(decoding: try encoder.encode(subjects), as: UTF8.self)
@@ -216,6 +231,7 @@ extension DeepSeekAssessmentClient: DeepSeekConnectionChecking {
     /// 只用于分析接口，模型列表仍使用官方根地址。401/403/429/5xx
     /// 沿用统一错误映射。
     public func checkConnection() async throws {
+        let configuration = configurationProvider.configuration()
         let request = try keyStore.withAPIKey { key -> URLRequest in
             let modelsBaseURL = configuration.baseURL.lastPathComponent == "beta"
                 ? configuration.baseURL.deletingLastPathComponent()
@@ -238,5 +254,17 @@ extension DeepSeekAssessmentClient: DeepSeekConnectionChecking {
         }
 
         try mapStatus(response)
+    }
+}
+
+private struct FixedDeepSeekConfigurationProvider: DeepSeekConfigurationProviding {
+    let value: DeepSeekConfiguration
+
+    init(configuration: DeepSeekConfiguration) {
+        self.value = configuration
+    }
+
+    func configuration() -> DeepSeekConfiguration {
+        value
     }
 }

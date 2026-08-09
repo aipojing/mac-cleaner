@@ -76,7 +76,7 @@ actor RecordingAIService: AIAnalysisServing {
     }
 }
 
-/// 内存 API Key double：不接触真实 Keychain。
+/// 内存 API Key double：不接触真实持久化存储。
 final class InMemoryAPIKeyStore: APIKeyManaging, APIKeyProviding, @unchecked Sendable {
     private var key: String?
 
@@ -102,6 +102,28 @@ final class InMemoryAPIKeyStore: APIKeyManaging, APIKeyProviding, @unchecked Sen
     func withAPIKey<T>(_ body: (String) throws -> T) throws -> T {
         guard let key else { throw APIKeyStoreError.notConfigured }
         return try body(key)
+    }
+}
+
+final class InMemoryDeepSeekConfigurationStore: DeepSeekConfigurationManaging, @unchecked Sendable {
+    private var current: DeepSeekConfiguration
+
+    init(configuration: DeepSeekConfiguration = DeepSeekConfiguration()) {
+        self.current = configuration
+    }
+
+    func configuration() -> DeepSeekConfiguration {
+        current
+    }
+
+    func update(model: String, baseURL: String) throws {
+        guard !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw DeepSeekConfigurationStoreError.invalidModel
+        }
+        guard let url = URL(string: baseURL), url.scheme == "https", url.host != nil else {
+            throw DeepSeekConfigurationStoreError.invalidBaseURL
+        }
+        current = DeepSeekConfiguration(baseURL: url, model: model)
     }
 }
 

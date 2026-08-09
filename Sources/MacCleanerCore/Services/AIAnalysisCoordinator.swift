@@ -33,7 +33,7 @@ public actor AIAnalysisCoordinator {
         provider: any AIAssessmentProviding,
         cache: AIAssessmentCache,
         retryClock: any AIRetryClock = BackoffRetryClock(),
-        keyManager: any APIKeyManaging = KeychainAPIKeyStore()
+        keyManager: any APIKeyManaging = UserDefaultsAPIKeyStore()
     ) {
         self.provider = provider
         self.cache = cache
@@ -41,7 +41,7 @@ public actor AIAnalysisCoordinator {
         self.keyManager = keyManager
     }
 
-    /// 只读本地缓存和 Keychain 配置状态，不调用 provider。
+    /// 只读本地缓存和 API Key 配置状态，不调用 provider。
     /// 缓存命中时无论是否配置 key 都直接展示——删除 key 不影响已有缓存；
     /// 缓存缺失时才区分 notConfigured / notAnalyzed。
     public func state(for subject: AIAssessmentSubject) async throws -> AIAssessmentState {

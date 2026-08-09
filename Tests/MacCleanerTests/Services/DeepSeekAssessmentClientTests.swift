@@ -4,6 +4,31 @@ import Testing
 
 @Suite("DeepSeek assessment client")
 struct DeepSeekAssessmentClientTests {
+    @Test("请求使用当前保存的模型 ID 和 Base URL")
+    func usesCurrentSavedConfiguration() async throws {
+        let suiteName = "DeepSeekAssessmentClientTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let configurationStore = UserDefaultsDeepSeekConfigurationStore(defaults: defaults)
+        let transport = MockHTTPTransport(response: .validToolResponse())
+        let client = DeepSeekAssessmentClient(
+            configurationProvider: configurationStore,
+            keyStore: InMemoryAPIKeyStore(key: "sk-secret"),
+            transport: transport
+        )
+        try configurationStore.update(
+            model: "deepseek-v4-flash",
+            baseURL: "https://api.deepseek.com/beta"
+        )
+
+        _ = try await client.assess([.cleanupFixture()])
+
+        let request = try #require(await transport.lastRequest)
+        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        #expect(request.url?.absoluteString == "https://api.deepseek.com/beta/chat/completions")
+        #expect(body.contains("\"model\":\"deepseek-v4-flash\""))
+    }
+
     @Test("请求只发送允许的元数据并强制工具输出")
     func sendsMinimalStructuredRequest() async throws {
         let transport = MockHTTPTransport(response: .validToolResponse())
