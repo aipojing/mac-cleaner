@@ -124,7 +124,7 @@ final class AISettingsViewModel {
         } catch let error as DeepSeekConfigurationStoreError {
             switch error {
             case .invalidModel:
-                serviceConfigurationErrorMessage = "请输入模型 ID"
+                serviceConfigurationErrorMessage = "请选择 DeepSeek V4 Flash 或 Pro"
             case .invalidBaseURL:
                 serviceConfigurationErrorMessage = "请输入有效的 HTTPS Base URL"
             }

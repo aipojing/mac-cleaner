@@ -5,9 +5,15 @@ import MacCleanerCore
 /// Key 写入本机应用偏好，不回显完整内容。
 struct AISettingsView: View {
     @Bindable var viewModel: AISettingsViewModel
+    let onBack: (() -> Void)?
 
     @State private var showDeleteKeyConfirm = false
     @State private var showClearCacheConfirm = false
+
+    init(viewModel: AISettingsViewModel, onBack: (() -> Void)? = nil) {
+        self.viewModel = viewModel
+        self.onBack = onBack
+    }
 
     var body: some View {
         Form {
@@ -57,11 +63,15 @@ struct AISettingsView: View {
             }
 
             Section("服务信息") {
-                TextField("模型 ID", text: $viewModel.modelInput)
-                    .textFieldStyle(.roundedBorder)
+                Picker("模型", selection: $viewModel.modelInput) {
+                    ForEach(DeepSeekModel.allCases) { model in
+                        Text(model.displayName).tag(model.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
                 TextField("Base URL", text: $viewModel.baseURLInput)
                     .textFieldStyle(.roundedBorder)
-                Text("当前默认值使用 /beta：这是 DeepSeek strict tool-call 的官方要求。")
+                Text("默认地址为 https://api.deepseek.com；使用兼容服务时可改为对应的 HTTPS 地址。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("保存服务配置") {
@@ -95,6 +105,34 @@ struct AISettingsView: View {
         }
         .formStyle(.grouped)
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let onBack {
+                VStack(spacing: 0) {
+                    HStack {
+                        Button(action: onBack) {
+                            Label("返回", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+
+                        Text("AI 设置")
+                            .font(.title2)
+                            .fontWeight(.bold)
+
+                        Spacer()
+
+                        Color.clear
+                            .frame(width: 72, height: 1)
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 18)
+
+                    Divider()
+                }
+            }
+        }
         .task { await viewModel.load() }
         .alert("确认发送数据范围", isPresented: $viewModel.presentPrivacyConsent) {
             Button("取消", role: .cancel) {

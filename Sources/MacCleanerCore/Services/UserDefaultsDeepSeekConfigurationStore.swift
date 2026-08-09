@@ -21,6 +21,8 @@ public enum DeepSeekConfigurationStoreError: Error, Equatable, Sendable {
 public final class UserDefaultsDeepSeekConfigurationStore: DeepSeekConfigurationManaging, @unchecked Sendable {
     public static let modelStorageKey = "deepSeekModel"
     public static let baseURLStorageKey = "deepSeekBaseURL"
+    private static let completedPublicBaseURLMigrationKey = "deepSeekCompletedPublicBaseURLMigration"
+    private static let legacyDefaultBaseURL = "https://api.deepseek.com/beta"
 
     private let defaults: UserDefaults
 
@@ -30,9 +32,11 @@ public final class UserDefaultsDeepSeekConfigurationStore: DeepSeekConfiguration
 
     public func configuration() -> DeepSeekConfiguration {
         let storedModel = defaults.string(forKey: Self.modelStorageKey)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let model = storedModel.flatMap { $0.isEmpty ? nil : $0 } ?? DeepSeekConfiguration.defaultModel
+        let model = storedModel
+            .flatMap(DeepSeekModel.init(rawValue:))?
+            .rawValue ?? DeepSeekConfiguration.defaultModel
 
-        let storedBaseURL = defaults.string(forKey: Self.baseURLStorageKey)
+        let storedBaseURL = migratedBaseURL()
         let baseURL = Self.normalizedBaseURL(storedBaseURL) ?? DeepSeekConfiguration.defaultBaseURL
 
         return DeepSeekConfiguration(baseURL: baseURL, model: model)
@@ -40,13 +44,32 @@ public final class UserDefaultsDeepSeekConfigurationStore: DeepSeekConfiguration
 
     public func update(model: String, baseURL: String) throws {
         let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedModel.isEmpty else { throw DeepSeekConfigurationStoreError.invalidModel }
+        guard DeepSeekModel(rawValue: trimmedModel) != nil else {
+            throw DeepSeekConfigurationStoreError.invalidModel
+        }
         guard let normalizedBaseURL = Self.normalizedBaseURL(baseURL) else {
             throw DeepSeekConfigurationStoreError.invalidBaseURL
         }
 
         defaults.set(trimmedModel, forKey: Self.modelStorageKey)
         defaults.set(normalizedBaseURL.absoluteString, forKey: Self.baseURLStorageKey)
+        defaults.set(true, forKey: Self.completedPublicBaseURLMigrationKey)
+    }
+
+    private func migratedBaseURL() -> String? {
+        let storedBaseURL = defaults.string(forKey: Self.baseURLStorageKey)
+        guard !defaults.bool(forKey: Self.completedPublicBaseURLMigrationKey) else {
+            return storedBaseURL
+        }
+
+        defaults.set(true, forKey: Self.completedPublicBaseURLMigrationKey)
+        guard storedBaseURL == Self.legacyDefaultBaseURL else {
+            return storedBaseURL
+        }
+
+        let publicBaseURL = DeepSeekConfiguration.defaultBaseURL.absoluteString
+        defaults.set(publicBaseURL, forKey: Self.baseURLStorageKey)
+        return publicBaseURL
     }
 
     private static func normalizedBaseURL(_ value: String?) -> URL? {

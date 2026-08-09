@@ -22,7 +22,7 @@ DevClean 帮助开发者找出 Xcode、模拟器、包管理器、Docker、AI �
 - 在桌面端查看扫描结果、磁盘树、重复文件、应用残留和进程信息。
 - 在 CLI 中输出可脚本化的 JSON 扫描结果，或按模块、按预设方案清理。
 - 对删除目标执行路径范围、受保护目录、符号链接和文件身份校验。
-- 可选接入 DeepSeek，为已选项目或进程提供解释与风险建议；可在设置中修改模型 ID 和 HTTPS Base URL；AI 不会自动选择、删除文件或结束进程。
+- 可选接入 DeepSeek，为已选项目或进程提供解释与风险建议；主界面的 AI 设置页可选择 DeepSeek V4 Flash 或 V4 Pro，并配置 HTTPS Base URL（默认 `https://api.deepseek.com`）；AI 不会自动选择、删除文件或结束进程。
 
 ## 扫描范围
 

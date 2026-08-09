@@ -176,28 +176,43 @@ struct DeepSeekAssessmentClientTests {
 }
 
 
-@Suite("DeepSeek strict mode compliance")
-struct DeepSeekStrictModeTests {
-    @Test("默认基础地址使用 /beta（strict tool call 官方要求）")
-    func defaultBaseURLUsesBeta() {
-        #expect(DeepSeekConfiguration.defaultBaseURL.absoluteString == "https://api.deepseek.com/beta")
+@Suite("DeepSeek tool call configuration")
+struct DeepSeekToolCallConfigurationTests {
+    @Test("默认基础地址使用公开 Chat API")
+    func defaultBaseURLUsesPublicChatAPI() {
+        #expect(DeepSeekConfiguration.defaultBaseURL.absoluteString == "https://api.deepseek.com")
     }
 
-    @Test("strict 模式 schema 不含服务端不支持的约束关键字")
-    func schemaAvoidsUnsupportedStrictKeys() {
-        // strict 模式：string 不支持 minLength/maxLength，array 不支持 minItems/maxItems。
-        // 服务端会校验 schema，含这些关键字会直接报错。
+    @Test("工具 schema 不含服务端方言约束关键字")
+    func schemaAvoidsServiceSpecificConstraints() {
         let data = try! JSONSerialization.data(withJSONObject: DeepSeekRequestSchema.toolParameters)
         let json = String(decoding: data, as: UTF8.self)
         for key in ["minLength", "maxLength", "minItems", "maxItems"] {
-            #expect(!json.contains("\"\(key)\""), "strict schema 不得包含 \(key)")
+            #expect(!json.contains("\"\(key)\""), "工具 schema 不得包含 \(key)")
         }
-        // 每个 object 必须 additionalProperties: false
+        // 每个 object 均禁止额外字段，便于本地严格校验返回结果。
         #expect(json.contains("\"additionalProperties\":false"))
     }
 }
 
-extension DeepSeekStrictModeTests {
+extension DeepSeekToolCallConfigurationTests {
+    @Test("默认请求使用公开地址且不启用 strict Beta 模式")
+    func defaultRequestUsesPublicEndpointWithoutStrictMode() async throws {
+        let transport = MockHTTPTransport(response: .validToolResponse())
+        let client = DeepSeekAssessmentClient(
+            configuration: DeepSeekConfiguration(),
+            keyStore: InMemoryAPIKeyStore(key: "sk-secret"),
+            transport: transport
+        )
+
+        _ = try await client.assess([.cleanupFixture()])
+
+        let request = try #require(await transport.lastRequest)
+        let body = String(decoding: try #require(request.httpBody), as: UTF8.self)
+        #expect(request.url?.absoluteString == "https://api.deepseek.com/chat/completions")
+        #expect(!body.contains("\"strict\":true"))
+    }
+
     @Test("请求显式关闭 thinking（V4 默认开启，与强制 tool_choice 冲突）")
     func requestDisablesThinking() async throws {
         let transport = MockHTTPTransport(response: .validToolResponse())

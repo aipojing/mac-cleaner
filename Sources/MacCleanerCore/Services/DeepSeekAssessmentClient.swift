@@ -1,10 +1,27 @@
 import Foundation
 
+public enum DeepSeekModel: String, CaseIterable, Sendable, Identifiable {
+    case flash = "deepseek-v4-flash"
+    case pro = "deepseek-v4-pro"
+
+    public static let allCases: [DeepSeekModel] = [.flash, .pro]
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .flash:
+            return "DeepSeek V4 Flash"
+        case .pro:
+            return "DeepSeek V4 Pro"
+        }
+    }
+}
+
 public struct DeepSeekConfiguration: Equatable, Sendable {
-    /// strict tool call 属于 Beta 特性，官方要求使用 /beta 基础地址。
-    /// 见 https://api-docs.deepseek.com/guides/tool_calls/
-    public static let defaultBaseURL = URL(string: "https://api.deepseek.com/beta")!
-    public static let defaultModel = "deepseek-v4-pro"
+    /// DeepSeek OpenAI 兼容 API 的公开基础地址。
+    public static let defaultBaseURL = URL(string: "https://api.deepseek.com")!
+    public static let defaultModel = DeepSeekModel.pro.rawValue
 
     public let baseURL: URL
     public let model: String
@@ -121,7 +138,6 @@ public struct DeepSeekAssessmentClient: AIAssessmentProviding {
                 "function": [
                     "name": DeepSeekRequestSchema.toolName,
                     "description": "提交对每个对象的结构化分析结论。",
-                    "strict": true,
                     "parameters": DeepSeekRequestSchema.toolParameters,
                 ] as [String: Any],
             ]],
@@ -227,9 +243,7 @@ public struct DeepSeekAssessmentClient: AIAssessmentProviding {
 
 extension DeepSeekAssessmentClient: DeepSeekConnectionChecking {
     /// `GET /models`：只携带 Authorization 和 Accept，不带 body，
-    /// 不构造 subject、prompt 或缓存记录。strict tool call 的 `/beta`
-    /// 只用于分析接口，模型列表仍使用官方根地址。401/403/429/5xx
-    /// 沿用统一错误映射。
+    /// 不构造 subject、prompt 或缓存记录。401/403/429/5xx 沿用统一错误映射。
     public func checkConnection() async throws {
         let configuration = configurationProvider.configuration()
         let request = try keyStore.withAPIKey { key -> URLRequest in

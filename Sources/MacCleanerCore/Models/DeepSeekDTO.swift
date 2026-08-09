@@ -55,10 +55,8 @@ struct SubmitAssessmentsArguments: Decodable {
 enum DeepSeekRequestSchema {
     static let toolName = "submit_assessments"
 
-    /// 工具的 JSON Schema 参数定义（严格模式，禁止额外字段）。
-    /// 注意 strict 模式服务端校验：object 必须 all-required + additionalProperties:false；
-    /// string 不支持 minLength/maxLength，array 不支持 minItems/maxItems——
-    /// 长度与数量约束全部在本地 `AIAssessment` 校验中执行，不写入 schema。
+    /// 工具调用的 JSON Schema 参数定义，禁止额外字段以保持返回结构稳定。
+    /// 长度与数量约束全部在本地 `AIAssessment` 校验中执行，避免依赖服务端方言。
     static var toolParameters: [String: Any] {
         [
             "type": "object",
