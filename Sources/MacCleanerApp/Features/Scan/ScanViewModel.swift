@@ -40,7 +40,9 @@ final class ScanViewModel {
         ModuleRegistry.availableModules()
     }
 
-    func startScan() {
+    func startScan(
+        largeFileMinimumAllocatedSize: Int64 = LargeFileScannerModule.defaultMinimumAllocatedSize
+    ) {
         scanTask?.cancel()
         results = []
         clearLiveLargeFileResults()
@@ -64,7 +66,10 @@ final class ScanViewModel {
         }
 
         scanTask = Task {
-            let modules = ModuleRegistry.modules(for: Array(moduleIDs))
+            let modules = ModuleRegistry.modules(
+                for: Array(moduleIDs),
+                largeFileMinimumAllocatedSize: largeFileMinimumAllocatedSize
+            )
                 .filter { $0.isAvailable() }
 
             guard !modules.isEmpty else {

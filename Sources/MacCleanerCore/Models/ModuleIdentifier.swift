@@ -40,7 +40,7 @@ public enum ModuleIdentifier: String, CaseIterable, Codable, Sendable {
         case .applicationCaches:
             return "~/Library/Caches 应用缓存"
         case .largeFiles:
-            return "主目录下 >100MB 的大文件"
+            return "主目录下的大文件（默认阈值 100 MB）"
         case .duplicateFiles:
             return "相同内容的重复文件"
         case .docker:

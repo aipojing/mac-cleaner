@@ -1,7 +1,9 @@
 import Foundation
 
 public struct ModuleRegistry {
-    public static func allModules() -> [any CleanerModule] {
+    public static func allModules(
+        largeFileMinimumAllocatedSize: Int64 = LargeFileScannerModule.defaultMinimumAllocatedSize
+    ) -> [any CleanerModule] {
         [
             DeveloperCachesModule(),
             IOSSimulatorsModule(),
@@ -11,7 +13,7 @@ public struct ModuleRegistry {
             DockerModule(),
             SystemLogsModule(),
             AndroidSDKModule(),
-            LargeFileScannerModule(),
+            LargeFileScannerModule(minAllocatedSize: largeFileMinimumAllocatedSize),
         ]
     }
 
@@ -23,8 +25,12 @@ public struct ModuleRegistry {
         allModules().first { $0.identifier == id }
     }
 
-    public static func modules(for ids: [ModuleIdentifier]) -> [any CleanerModule] {
+    public static func modules(
+        for ids: [ModuleIdentifier],
+        largeFileMinimumAllocatedSize: Int64 = LargeFileScannerModule.defaultMinimumAllocatedSize
+    ) -> [any CleanerModule] {
         let idSet = Set(ids)
-        return allModules().filter { idSet.contains($0.identifier) }
+        return allModules(largeFileMinimumAllocatedSize: largeFileMinimumAllocatedSize)
+            .filter { idSet.contains($0.identifier) }
     }
 }

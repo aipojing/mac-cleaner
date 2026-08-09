@@ -106,4 +106,10 @@ struct ScanViewModelLiveResultsTests {
         viewModel.selectedModuleIDs = [.largeFiles, .developerCaches]
         #expect(!viewModel.isLargeFileScan)
     }
+
+    @Test("大文件扫描阈值提供 200 MB 预设")
+    func exposesTwoHundredMegabyteThreshold() {
+        #expect(LargeFileThreshold.default == .megabytes100)
+        #expect(LargeFileThreshold.megabytes200.minimumAllocatedSize == 200 * 1024 * 1024)
+    }
 }

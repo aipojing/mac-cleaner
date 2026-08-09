@@ -4,6 +4,7 @@ import MacCleanerCore
 struct ScanView: View {
     @Bindable var viewModel: ScanViewModel
     var onNavigate: ((String) -> Void)?
+    @AppStorage(LargeFileThreshold.storageKey) private var largeFileMinimumSizeMB = LargeFileThreshold.default.rawValue
 
     var body: some View {
         HStack(spacing: 0) {
@@ -208,12 +209,7 @@ struct ScanView: View {
                     subtitle: "深度分析存储情况",
                     key: "diskVisualization"
                 )
-                toolCard(
-                    icon: "doc.badge.gearshape", colors: [.orange, .yellow],
-                    title: "大文件清理",
-                    subtitle: "查找 100MB 以上的文件",
-                    key: "largeFiles"
-                )
+                largeFilesToolCard
                 toolCard(
                     icon: "memorychip", colors: [.mint, .teal],
                     title: "内存清理",
@@ -235,15 +231,43 @@ struct ScanView: View {
         .background(Color(.windowBackgroundColor))
     }
 
+    private var largeFilesToolCard: some View {
+        Menu {
+            Text("阈值越高，候选越少，扫描通常更快。")
+                .foregroundStyle(.secondary)
+            Divider()
+
+            ForEach(LargeFileThreshold.allCases) { threshold in
+                Button("扫描 \(threshold.displayName) 以上的文件\(threshold == selectedLargeFileThreshold ? "（当前）" : "")") {
+                    largeFileMinimumSizeMB = threshold.rawValue
+                    startLargeFileScan(with: threshold)
+                }
+            }
+        } label: {
+            VStack(spacing: 10) {
+                GradientIconBadge(icon: "doc.badge.gearshape", size: 56, colors: [.orange, .yellow])
+
+                Text("大文件清理")
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+
+                Text("查找 \(selectedLargeFileThreshold.displayName) 以上的文件")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .brandCard()
+        }
+        .menuStyle(.borderlessButton)
+    }
+
     private func toolCard(icon: String, colors: [Color], title: String, subtitle: String, key: String) -> some View {
         Button {
-            if key == "largeFiles" {
-                // 大文件走扫描流程
-                viewModel.selectedModuleIDs = [.largeFiles]
-                viewModel.startScan()
-            } else {
-                onNavigate?(key)
-            }
+            onNavigate?(key)
         } label: {
             VStack(spacing: 10) {
                 GradientIconBadge(icon: icon, size: 56, colors: colors)
@@ -264,6 +288,17 @@ struct ScanView: View {
             .brandCard()
         }
         .buttonStyle(BrandCardButtonStyle())
+    }
+
+    private var selectedLargeFileThreshold: LargeFileThreshold {
+        LargeFileThreshold(rawValue: largeFileMinimumSizeMB) ?? .default
+    }
+
+    private func startLargeFileScan(with threshold: LargeFileThreshold) {
+        viewModel.selectedModuleIDs = [.largeFiles]
+        viewModel.startScan(
+            largeFileMinimumAllocatedSize: threshold.minimumAllocatedSize
+        )
     }
 
     private var isScanning: Bool {

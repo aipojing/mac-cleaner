@@ -1,21 +1,25 @@
 import Foundation
 
 public struct LargeFileScannerModule: CleanerModule {
+    public static let defaultMinimumAllocatedSize: Int64 = 100 * 1024 * 1024
+
     public let identifier = ModuleIdentifier.largeFiles
     public let displayName = "大文件"
-    public let description = "主目录下 >100MB 的大文件"
+    public var description: String {
+        "主目录下 ≥\(minimumAllocatedSize.formattedSize) 的大文件"
+    }
 
     private let scanRoot: String
-    private let minAllocatedSize: Int64
+    public let minimumAllocatedSize: Int64
     private let limit: Int
 
     public init(
         scanRoot: String = DiskScanner.homeDirectory,
-        minAllocatedSize: Int64 = 100 * 1024 * 1024,
+        minAllocatedSize: Int64 = defaultMinimumAllocatedSize,
         limit: Int = 50
     ) {
         self.scanRoot = scanRoot
-        self.minAllocatedSize = minAllocatedSize
+        self.minimumAllocatedSize = minAllocatedSize
         self.limit = limit
     }
 
@@ -131,7 +135,7 @@ public struct LargeFileScannerModule: CleanerModule {
                     modificationTimeNanoseconds: Int64(st.st_mtimespec.tv_sec) * 1_000_000_000
                         + Int64(st.st_mtimespec.tv_nsec)
                 )
-                guard metadata.allocatedSize >= minAllocatedSize else { continue }
+                guard metadata.allocatedSize >= minimumAllocatedSize else { continue }
                 matchedFileCount += 1
                 // 硬链接去重：同一 (device, inode) 的物理占用只计一次
                 if countedIdentities.insert("\(st.st_dev):\(st.st_ino)").inserted {

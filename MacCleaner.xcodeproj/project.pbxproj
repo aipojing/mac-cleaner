@@ -49,6 +49,7 @@
 		C0C9F77E1597D469B0308320 /* ActivityMonitorAIViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E978F190EA33666CCA93EE64 /* ActivityMonitorAIViewModelTests.swift */; };
 		C287F6E77CB39F6B69671FD0 /* AIAssessmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11EECDCE5270AA6C6CDF53D6 /* AIAssessmentCard.swift */; };
 		C3B4DFB4D49E20CC44E54B3D /* ScanSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DE977A06E1DFE990B2A876 /* ScanSummaryView.swift */; };
+		C75FEDB34D2B6F10A2F2F8AC /* LargeFileThreshold.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BE26CEFB38BA45597D6820 /* LargeFileThreshold.swift */; };
 		CC9E8222653C35CBE23741C7 /* AIPrivacyConsentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387EB677156DD71A64C0A36B /* AIPrivacyConsentStore.swift */; };
 		CCBA924E2229E6DF70A44D4A /* AppUninstallerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D9D19A165DC5124D80AEBC /* AppUninstallerViewModel.swift */; };
 		D19A7D266A9BB8DF055E362C /* DuplicateFinderViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F702D31DCE972E2F0C325F /* DuplicateFinderViewModelTests.swift */; };
@@ -73,6 +74,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00BE26CEFB38BA45597D6820 /* LargeFileThreshold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LargeFileThreshold.swift; sourceTree = "<group>"; };
 		02DE977A06E1DFE990B2A876 /* ScanSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanSummaryView.swift; sourceTree = "<group>"; };
 		0425C907D7C5AEEF78FBDF04 /* DuplicateFinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateFinderView.swift; sourceTree = "<group>"; };
 		09205986F2B94BC55260B2FF /* AISettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsView.swift; sourceTree = "<group>"; };
@@ -122,7 +124,6 @@
 		DE811C52ED78CF28FEBD99CA /* DiskVisualizationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskVisualizationView.swift; sourceTree = "<group>"; };
 		E3D9D19A165DC5124D80AEBC /* AppUninstallerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUninstallerViewModel.swift; sourceTree = "<group>"; };
 		E5A5D788F4519D68EA93F17E /* helper */ = {isa = PBXFileReference; includeInIndex = 0; path = helper; sourceTree = BUILT_PRODUCTS_DIR; };
-		E7D3520A5CAD3C5AA93A7066 /* mac-cleaner */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mac-cleaner"; path = .; sourceTree = SOURCE_ROOT; };
 		E7F922B6298A0F3865594B0E /* MacCleanerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MacCleanerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8C557A3B1C4E2D1B23811F1 /* AISettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISettingsViewModel.swift; sourceTree = "<group>"; };
 		E978F190EA33666CCA93EE64 /* ActivityMonitorAIViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityMonitorAIViewModelTests.swift; sourceTree = "<group>"; };
@@ -130,6 +131,7 @@
 		EE174AC6FBFE2DAF57594143 /* ResultsSearchViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsSearchViewModelTests.swift; sourceTree = "<group>"; };
 		F63AB7848A540423B1886C9D /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		F6B827736F288C70CE937741 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
+		E7D3520A5CAD3C5AA93A7066 /* mac-cleaner */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "mac-cleaner"; path = .; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -344,6 +346,7 @@
 		E44BB2724FBFBA25BB7EC124 /* Scan */ = {
 			isa = PBXGroup;
 			children = (
+				00BE26CEFB38BA45597D6820 /* LargeFileThreshold.swift */,
 				02DE977A06E1DFE990B2A876 /* ScanSummaryView.swift */,
 				8CBA90884C08F3815135D126 /* ScanView.swift */,
 				97C3FF8DE7B75F6C6C9B2368 /* ScanViewModel.swift */,
@@ -570,6 +573,7 @@
 				B9795327C24D8190F274D489 /* DuplicateFinderViewModel.swift in Sources */,
 				126A3C90C27023A82A3BBFBF /* ItemRowView.swift in Sources */,
 				9099C13D7CE40389351A79AD /* LanguageManager.swift in Sources */,
+				C75FEDB34D2B6F10A2F2F8AC /* LargeFileThreshold.swift in Sources */,
 				1BEC832A88EB2F02667343A0 /* MacCleanerApp.swift in Sources */,
 				BE67678B9D8FB0A8D2728E7F /* MemoryCleanerView.swift in Sources */,
 				9D773FC563138BFB2C612CAA /* MemoryCleanerViewModel.swift in Sources */,
