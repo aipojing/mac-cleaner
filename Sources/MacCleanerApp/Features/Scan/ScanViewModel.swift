@@ -182,16 +182,18 @@ final class ScanViewModel {
         phase = .idle
     }
 
-    /// 应用核心层已限频的实时快照；只替换临时状态，绝不写入正式 results。
+    /// 应用核心层已限频的实时快照；同步扫描页统计，但绝不写入正式 results。
     func applyLargeFileUpdate(_ update: LargeFileScanUpdate) {
         liveLargeFileItems = update.items
         liveLargeFileMatchCount = update.matchedFileCount
         liveLargeFileMatchedSize = update.matchedAllocatedSize
+        totalDiscoveredSize = update.matchedAllocatedSize
     }
 
     private func clearLiveLargeFileResults() {
         liveLargeFileItems = []
         liveLargeFileMatchCount = 0
         liveLargeFileMatchedSize = 0
+        totalDiscoveredSize = 0
     }
 }

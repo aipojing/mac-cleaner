@@ -43,6 +43,7 @@ struct ScanViewModelLiveResultsTests {
         viewModel.cancel()
         #expect(viewModel.liveLargeFileItems.isEmpty)
         #expect(viewModel.liveLargeFileMatchCount == 0)
+        #expect(viewModel.totalDiscoveredSize == 0)
     }
 
     @Test("后续快照替换而非追加，且绝不写入正式结果")
@@ -66,6 +67,20 @@ struct ScanViewModelLiveResultsTests {
         #expect(viewModel.liveLargeFileItems.map(\.path) == ["/tmp/b", "/tmp/a"])
         #expect(viewModel.liveLargeFileMatchCount == 3)
         #expect(viewModel.liveLargeFileMatchedSize == 1500)
+        #expect(viewModel.results.isEmpty, "实时快照不得写入正式结果")
+    }
+
+    @Test("实时大文件快照会更新扫描页显示的已发现占用")
+    func updatesDisplayedDiscoveredSizeFromLiveSnapshot() {
+        let viewModel = ScanViewModel()
+
+        viewModel.applyLargeFileUpdate(.liveFixture(
+            items: [.liveFixture(path: "/tmp/a", size: 200)],
+            matchedFileCount: 3,
+            matchedAllocatedSize: 1_500
+        ))
+
+        #expect(viewModel.totalDiscoveredSize == 1_500)
         #expect(viewModel.results.isEmpty, "实时快照不得写入正式结果")
     }
 
