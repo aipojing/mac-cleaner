@@ -9,8 +9,9 @@ struct MacCleanerApp: App {
     @State private var scanAction: () -> Void = {}
 
     var body: some Scene {
-        WindowGroup(id: "main") {
+        Window("DevClean", id: "main") {
             ContentView(onScanRequested: $scanAction, environment: environment)
+                .background(MainWindowTagger())
                 .tint(themeManager.accentColor)
                 .environment(\.locale, languageManager.effectiveLocale)
         }

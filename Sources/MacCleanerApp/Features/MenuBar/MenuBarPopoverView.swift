@@ -4,6 +4,7 @@ import MacCleanerCore
 struct MenuBarPopoverView: View {
     @Bindable var viewModel: MenuBarViewModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(spacing: 12) {
@@ -62,7 +63,12 @@ struct MenuBarPopoverView: View {
             // 操作按钮
             VStack(spacing: 8) {
                 Button {
-                    openWindow(id: "main")
+                    if let window = MainWindowFinder.find(in: NSApp.windows) {
+                        window.deminiaturize(nil)
+                        window.makeKeyAndOrderFront(nil)
+                    } else {
+                        openWindow(id: "main")
+                    }
                     NSApp.activate(ignoringOtherApps: true)
                 } label: {
                     Label("打开 DevClean", systemImage: "window.shade.open")
@@ -72,9 +78,28 @@ struct MenuBarPopoverView: View {
                 .buttonStyle(.borderedProminent)
 
                 Button {
+                    SettingsNavigation.selectAI()
+                    openSettings()
+                } label: {
+                    Label("AI 设置", systemImage: "sparkles")
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.small)
+
+                Button {
                     viewModel.refresh()
                 } label: {
                     Label("刷新", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.small)
+
+                Divider()
+
+                Button(role: .destructive) {
+                    NSApp.terminate(nil)
+                } label: {
+                    Label("退出 DevClean", systemImage: "power")
                         .frame(maxWidth: .infinity)
                 }
                 .controlSize(.small)

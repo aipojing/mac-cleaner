@@ -5,23 +5,27 @@ struct SettingsView: View {
     @Bindable var languageManager: LanguageManager
     let environment: AppEnvironment
     @State private var showRestartHint = false
+    @AppStorage(SettingsNavigation.selectedTabStorageKey) private var selectedTab = SettingsTab.appearance.rawValue
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             appearanceTab
                 .tabItem {
                     Label("外观", systemImage: "paintbrush")
                 }
+                .tag(SettingsTab.appearance.rawValue)
 
             languageTab
                 .tabItem {
                     Label("语言", systemImage: "globe")
                 }
+                .tag(SettingsTab.language.rawValue)
 
             AISettingsView(viewModel: environment.aiSettingsViewModel)
             .tabItem {
                 Label("AI", systemImage: "sparkles")
             }
+            .tag(SettingsTab.ai.rawValue)
         }
         .frame(width: 420, height: 420)
     }
