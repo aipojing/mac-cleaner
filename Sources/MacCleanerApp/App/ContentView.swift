@@ -15,7 +15,6 @@ struct ContentView: View {
     @State private var appUninstallerVM = AppUninstallerViewModel()
     @State private var duplicateFinderVM = DuplicateFinderViewModel()
     @State private var diskVizVM = DiskVisualizationViewModel()
-    @State private var memoryCleanerVM = MemoryCleanerViewModel()
     @State private var activityMonitorVM: ActivityMonitorViewModel
 
     init(onScanRequested: Binding<() -> Void>, environment: AppEnvironment) {
@@ -27,14 +26,13 @@ struct ContentView: View {
         ))
     }
 
-    enum Screen {
+    enum Screen: Equatable {
         case scan
         case summary
         case results
         case appUninstaller
         case duplicateFinder
         case diskVisualization
-        case memoryCleaner
         case activityMonitor
         case aiSettings
     }
@@ -48,7 +46,6 @@ struct ContentView: View {
                     case "appUninstaller": screen = .appUninstaller
                     case "duplicateFinder": screen = .duplicateFinder
                     case "diskVisualization": screen = .diskVisualization
-                    case "memoryCleaner": screen = .memoryCleaner
                     case "activityMonitor": screen = .activityMonitor
                     case "aiSettings": screen = .aiSettings
                     default: break
@@ -72,7 +69,6 @@ struct ContentView: View {
                         case "appUninstaller": screen = .appUninstaller
                         case "duplicateFinder": screen = .duplicateFinder
                         case "diskVisualization": screen = .diskVisualization
-                        case "memoryCleaner": screen = .memoryCleaner
                         case "activityMonitor": screen = .activityMonitor
                         default: break
                         }
@@ -94,37 +90,31 @@ struct ContentView: View {
             case .appUninstaller:
                 AppUninstallerView(
                     viewModel: appUninstallerVM,
-                    onBack: { screen = .scan }
+                    onBack: returnFromTool
                 )
 
             case .duplicateFinder:
                 DuplicateFinderView(
                     viewModel: duplicateFinderVM,
-                    onBack: { screen = .scan }
+                    onBack: returnFromTool
                 )
 
             case .diskVisualization:
                 DiskVisualizationView(
                     viewModel: diskVizVM,
-                    onBack: { screen = .scan }
-                )
-
-            case .memoryCleaner:
-                MemoryCleanerView(
-                    viewModel: memoryCleanerVM,
-                    onBack: { screen = .scan }
+                    onBack: returnFromTool
                 )
 
             case .activityMonitor:
                 ActivityMonitorView(
                     viewModel: activityMonitorVM,
-                    onBack: { screen = .scan }
+                    onBack: returnFromTool
                 )
 
             case .aiSettings:
                 AISettingsView(
                     viewModel: environment.aiSettingsViewModel,
-                    onBack: { screen = .scan }
+                    onBack: returnFromTool
                 )
             }
         }
@@ -132,7 +122,9 @@ struct ContentView: View {
         // 全局字号上调一档：所有语义字体（caption/callout/body…）随 Dynamic Type 放大
         .dynamicTypeSize(.large)
         .onChange(of: scanVM.phase) { _, newPhase in
-            if newPhase == .done {
+            // 仅在用户仍停留在扫描页时自动跳转；
+            // 扫描期间进入其他功能页（活动监视器、磁盘可视化等）不打断。
+            if newPhase == .done, screen == .scan {
                 screen = .summary
             }
         }
@@ -177,5 +169,15 @@ struct ContentView: View {
         resultsVM = nil
         screen = .scan
         scanVM.reset()
+    }
+
+    /// 从其他功能页返回时，保留后台扫描的真实状态：扫描中继续展示进度；
+    /// 若扫描已在后台结束则直接展示摘要，避免回到看似空闲的首页。
+    func returnFromTool() {
+        screen = Self.screenWhenReturningFromTool(phase: scanVM.phase)
+    }
+
+    static func screenWhenReturningFromTool(phase: ScanViewModel.Phase) -> Screen {
+        phase == .done ? .summary : .scan
     }
 }
