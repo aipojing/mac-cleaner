@@ -145,7 +145,7 @@ struct ContentView: View {
         .onAppear {
             onScanRequested = {
                 rescan()
-                scanVM.startScan()
+                scanVM.startStandardScan()
             }
         }
         .sheet(isPresented: $showCleanup) {
