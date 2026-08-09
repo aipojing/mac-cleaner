@@ -221,4 +221,31 @@ struct AppUninstallerRaceTests {
         #expect(viewModel.residuals?.groups.first?.label == "prefetched")
         #expect(await service.residualScanCallCount == 1, "打开已预扫的应用不得重复遍历磁盘")
     }
+
+    @Test("重开卸载器会复用当天的关联文件总计")
+    func reusesPersistedResidualTotalAcrossViewModels() async {
+        let app = makeApp("com.example.persisted.\(UUID().uuidString)")
+        let service = PrefetchingAppUninstalling(
+            apps: [app],
+            residualsByBundleID: [app.bundleID: makeResiduals(label: "persisted")]
+        )
+
+        let firstViewModel = AppUninstallerViewModel(service: service)
+        firstViewModel.loadApps()
+        for _ in 0..<200 where !firstViewModel.hasScannedResidualTotal(for: app) {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        let secondViewModel = AppUninstallerViewModel(service: service)
+        secondViewModel.loadApps()
+        for _ in 0..<200 where !secondViewModel.hasScannedResidualTotal(for: app) {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        #expect(secondViewModel.displaySize(for: app) == 110)
+        #expect(
+            await service.residualScanCallCount == 1,
+            "同一应用的当天总计已落盘时，重新打开卸载器不应再遍历关联目录"
+        )
+    }
 }

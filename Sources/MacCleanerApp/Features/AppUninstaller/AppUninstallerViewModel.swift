@@ -2,6 +2,66 @@ import Foundation
 import MacCleanerCore
 import AppKit
 
+/// 仅保存关联文件的展示总计；删除前的具体文件清单始终重新扫描并校验身份。
+private final class AppUninstallerResidualTotalStore {
+    private struct Entry: Codable {
+        let path: String
+        let bundleSize: Int64
+        let residualSize: Int64
+        let savedAt: Date
+    }
+
+    private let defaults: UserDefaults
+    private let key = "appUninstaller.residualTotals.v1"
+    private let validity: TimeInterval = 24 * 60 * 60
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func cachedResidualTotal(for app: InstalledApp, now: Date = .now) -> Int64? {
+        guard let entry = entries()[cacheKey(for: app)],
+              entry.path == app.path,
+              entry.bundleSize == app.bundleSize,
+              now.timeIntervalSince(entry.savedAt) < validity
+        else { return nil }
+        return entry.residualSize
+    }
+
+    func save(residualTotal: Int64, for app: InstalledApp, now: Date = .now) {
+        var savedEntries = entries()
+        savedEntries[cacheKey(for: app)] = Entry(
+            path: app.path,
+            bundleSize: app.bundleSize,
+            residualSize: residualTotal,
+            savedAt: now
+        )
+        persist(savedEntries)
+    }
+
+    func remove(for app: InstalledApp) {
+        var savedEntries = entries()
+        savedEntries.removeValue(forKey: cacheKey(for: app))
+        persist(savedEntries)
+    }
+
+    private func cacheKey(for app: InstalledApp) -> String {
+        "\(app.bundleID)|\(app.path)"
+    }
+
+    private func entries() -> [String: Entry] {
+        guard let data = defaults.data(forKey: key),
+              let savedEntries = try? JSONDecoder().decode([String: Entry].self, from: data)
+        else { return [:] }
+        return savedEntries
+    }
+
+    private func persist(_ entries: [String: Entry]) {
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        defaults.set(data, forKey: key)
+    }
+}
+
 @Observable
 @MainActor
 final class AppUninstallerViewModel {
@@ -26,6 +86,7 @@ final class AppUninstallerViewModel {
     private(set) var residualPrefetchTotal = 0
 
     private let service: any AppUninstalling
+    private let residualTotalStore: AppUninstallerResidualTotalStore
     private var loadAppsTask: Task<Void, Never>?
     private var residualsTask: Task<Void, Never>?
     private var residualPrefetchTask: Task<Void, Never>?
@@ -34,6 +95,7 @@ final class AppUninstallerViewModel {
 
     init(service: any AppUninstalling = AppUninstallerService()) {
         self.service = service
+        self.residualTotalStore = AppUninstallerResidualTotalStore()
     }
 
     var filteredApps: [InstalledApp] {
@@ -61,7 +123,14 @@ final class AppUninstallerViewModel {
             apps = result
             phase = .ready
             loadAppsTask = nil
-            startBackgroundResidualPrefetch(for: result)
+            for app in result {
+                if let cachedTotal = residualTotalStore.cachedResidualTotal(for: app) {
+                    residualTotalsByAppID[app.id] = cachedTotal
+                }
+            }
+            startBackgroundResidualPrefetch(for: result.filter {
+                residualTotalsByAppID[$0.id] == nil
+            })
         }
     }
 
@@ -140,6 +209,7 @@ final class AppUninstallerViewModel {
         residualScanTasksByAppID.removeValue(forKey: app.id)
         residualCacheByAppID[app.id] = result
         residualTotalsByAppID[app.id] = result.totalSize
+        residualTotalStore.save(residualTotal: result.totalSize, for: app)
         return result
     }
 
@@ -221,6 +291,7 @@ final class AppUninstallerViewModel {
                 self.apps.removeAll { $0.id == app.id }
                 self.residualTotalsByAppID.removeValue(forKey: app.id)
                 self.residualCacheByAppID.removeValue(forKey: app.id)
+                self.residualTotalStore.remove(for: app)
                 self.selectedApp = nil
                 self.residuals = nil
                 self.phase = .ready
